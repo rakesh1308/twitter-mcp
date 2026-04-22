@@ -1,10 +1,11 @@
 # Twitter MCP Server
 
-A Model Context Protocol (MCP) server for Twitter API v2 with Streamable HTTP transport. Deploy to Zeabur and use with any AI client that supports MCP.
+A Model Context Protocol (MCP) server for Twitter API v2 with OAuth 1.0a authentication. Deploy to Zeabur and use with any AI client that supports MCP.
 
 ## Features
 
 - **Multi-account support**: Configure up to 2 Twitter accounts
+- **OAuth 1.0a authentication**: More reliable than Bearer Token
 - **Post tweets**: Create new tweets
 - **Reply to tweets**: Reply to existing tweets
 - **Search tweets**: Search recent or all tweets
@@ -18,21 +19,23 @@ A Model Context Protocol (MCP) server for Twitter API v2 with Streamable HTTP tr
 ## Prerequisites
 
 1. Node.js 20+ installed locally
-2. Twitter Developer account with API access
+2. Twitter Developer account with API access (Basic, Pro, or Free tier)
 3. Zeabur account for deployment
 
 ## Twitter API Setup
 
 1. Go to [Twitter Developer Portal](https://developer.twitter.com/en/portal/dashboard)
-2. Create a new Project and App (or use existing)
-3. Navigate to "Keys and tokens" tab
-4. Generate the following:
-   - **Bearer Token** (for app-only authentication)
-   - **Access Token & Access Token Secret** (for user context - optional but recommended for write operations)
+2. Create a Project and App (required for API v2 access)
+3. Navigate to "Keys and tokens" tab for your App
+4. Generate the following credentials:
+   - **API Key** - Consumer API Key
+   - **API Secret** - Consumer API Secret
+   - **Access Token** - User Access Token (under "Authentication Tokens")
+   - **Access Token Secret** - User Access Token Secret
 
 ### Required API Permissions
 
-Make sure your app has the following permissions in your Twitter Developer Portal:
+Make sure your app has **Read and Write** permissions in your Twitter Developer Portal:
 - **Read** - For reading tweets, searching, user info
 - **Write** - For posting, replying, deleting tweets
 
@@ -49,15 +52,17 @@ npm install
 Create a `.env` file in the root directory:
 
 ```env
-# Account 1 Configuration
+# Account 1 Configuration (Required)
 ACCOUNT1_NAME=MyMainAccount
-ACCOUNT1_BEARER_TOKEN=your_bearer_token_here
+ACCOUNT1_API_KEY=your_api_key_here
+ACCOUNT1_API_SECRET=your_api_secret_here
 ACCOUNT1_ACCESS_TOKEN=your_access_token_here
 ACCOUNT1_ACCESS_TOKEN_SECRET=your_access_token_secret_here
 
 # Account 2 Configuration (optional)
 ACCOUNT2_NAME=MySecondAccount
-ACCOUNT2_BEARER_TOKEN=your_second_bearer_token_here
+ACCOUNT2_API_KEY=your_second_api_key_here
+ACCOUNT2_API_SECRET=your_second_api_secret_here
 ACCOUNT2_ACCESS_TOKEN=your_second_access_token_here
 ACCOUNT2_ACCESS_TOKEN_SECRET=your_second_access_token_secret_here
 
@@ -93,7 +98,8 @@ curl http://localhost:3000/
 3. Click "Deploy New Service"
 4. Select "GitHub" and connect your repository
 5. Configure environment variables:
-   - `ACCOUNT1_BEARER_TOKEN`
+   - `ACCOUNT1_API_KEY`
+   - `ACCOUNT1_API_SECRET`
    - `ACCOUNT1_ACCESS_TOKEN`
    - `ACCOUNT1_ACCESS_TOKEN_SECRET`
    - (And similar for Account 2)
@@ -101,7 +107,7 @@ curl http://localhost:3000/
 
 ### Option 2: Deploy with Dockerfile
 
-1. Create a `Dockerfile` (already included in this project)
+1. The `Dockerfile` is already included in this project
 2. Upload your code to Zeabur
 3. Zeabur will use the Dockerfile to build and deploy
 
@@ -111,10 +117,14 @@ Configure these in Zeabur's environment variables panel:
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `ACCOUNT1_BEARER_TOKEN` | Bearer token for account 1 | Yes |
-| `ACCOUNT1_ACCESS_TOKEN` | Access token for account 1 | Recommended |
-| `ACCOUNT1_ACCESS_TOKEN_SECRET` | Access token secret for account 1 | Recommended |
-| `ACCOUNT2_BEARER_TOKEN` | Bearer token for account 2 | If using 2nd account |
+| `ACCOUNT1_API_KEY` | API Key for account 1 | Yes |
+| `ACCOUNT1_API_SECRET` | API Secret for account 1 | Yes |
+| `ACCOUNT1_ACCESS_TOKEN` | Access Token for account 1 | Yes |
+| `ACCOUNT1_ACCESS_TOKEN_SECRET` | Access Token Secret for account 1 | Yes |
+| `ACCOUNT2_API_KEY` | API Key for account 2 | If using 2nd account |
+| `ACCOUNT2_API_SECRET` | API Secret for account 2 | If using 2nd account |
+| `ACCOUNT2_ACCESS_TOKEN` | Access Token for account 2 | If using 2nd account |
+| `ACCOUNT2_ACCESS_TOKEN_SECRET` | Access Token Secret for account 2 | If using 2nd account |
 | `PORT` | Server port (default: 3000) | No |
 
 ## AI Client Configuration
@@ -198,12 +208,12 @@ twitter-mcp/
 ├── src/
 │   ├── index.ts       # Main MCP server with Express
 │   ├── config.ts      # Configuration loader
-│   ├── twitterClient.ts  # Twitter API client
+│   ├── twitterClient.ts  # Twitter API client with OAuth 1.0a
 │   └── types.ts       # TypeScript types
 ├── Dockerfile         # Docker deployment
 ├── package.json       # Dependencies
 ├── tsconfig.json      # TypeScript config
-├── .env.example       # Example environment file
+├── .env.example      # Example environment file
 └── README.md          # This file
 ```
 
@@ -218,17 +228,23 @@ twitter-mcp/
 ## Troubleshooting
 
 ### "No Twitter accounts configured" error
-- Ensure your `.env` file exists and has `ACCOUNT1_BEARER_TOKEN` set
+- Ensure your `.env` file exists and has all 4 required variables for ACCOUNT1
 - Check for typos in variable names
+- All four are required: API_KEY, API_SECRET, ACCESS_TOKEN, ACCESS_TOKEN_SECRET
 
-### "Account not found" error
-- Verify account name matches exactly in your `.env` configuration
-- Check the `list_accounts` tool to see available accounts
+### "OAuth 1.0a requires access token and secret" error
+- Make sure you have provided ACCESS_TOKEN and ACCESS_TOKEN_SECRET
+- These are different from API Key/Secret
+
+### 403 Forbidden error
+- Ensure your App is attached to a Project
+- Verify your App has Read+Write permissions
+- Check that your Access Token has the right permissions
 
 ### Rate limiting
-- Twitter API has rate limits (varies by endpoint)
+- Twitter API has rate limits (varies by endpoint and tier)
+- Free tier: ~450 requests per 15 minutes
 - Implement exponential backoff for retry logic if needed
-- Consider caching frequently accessed data
 
 ## License
 
