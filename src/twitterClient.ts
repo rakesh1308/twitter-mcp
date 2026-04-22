@@ -26,6 +26,10 @@ export class TwitterClient {
         return hmac.digest("base64");
       },
     });
+    
+    console.log(`[TwitterClient] Initialized for account: ${account.name}`);
+    console.log(`[TwitterClient] API Key: ${account.apiKey.substring(0, 10)}...`);
+    console.log(`[TwitterClient] Access Token: ${account.accessToken.substring(0, 20)}...`);
   }
 
   private async oauth1Request<T>(
@@ -39,6 +43,8 @@ export class TwitterClient {
     const url = `${TWITTER_API_BASE}${endpoint}`;
     const method = (options.method || "GET").toUpperCase() as "GET" | "POST" | "PUT" | "DELETE";
     
+    console.log(`[OAuth Request] ${method} ${url}`);
+    
     // Parse query parameters from URL
     const urlObj = new URL(url);
     const queryData: Record<string, string> = {};
@@ -47,33 +53,35 @@ export class TwitterClient {
     });
 
     // Generate OAuth authorization header
-    const authHeader = this.oauth.authorize(
-      {
-        url: urlObj.origin + urlObj.pathname + "?" + urlObj.searchParams.toString(),
-        method: method,
-      },
-      {
-        key: this.account.accessToken,
-        secret: this.account.accessTokenSecret,
-      }
-    );
-
-    // For GET requests, include OAuth params in the URL
-    let finalUrl = url;
-    if (method === "GET" && Object.keys(queryData).length === 0) {
-      // Extract just the base URL without query params for GET
-      finalUrl = `${urlObj.origin}${urlObj.pathname}`;
-    }
+    const authData = {
+      url: urlObj.origin + urlObj.pathname + (urlObj.search ? urlObj.search : ""),
+      method: method,
+    };
+    
+    const token = {
+      key: this.account.accessToken,
+      secret: this.account.accessTokenSecret,
+    };
+    
+    console.log(`[OAuth] Auth URL: ${authData.url}`);
+    console.log(`[OAuth] Token Key: ${token.key.substring(0, 20)}...`);
+    
+    const authHeader = this.oauth.authorize(authData, token);
+    const headerAuth = this.oauth.toHeader(authHeader);
+    
+    console.log(`[OAuth] Authorization: ${headerAuth.Authorization.substring(0, 50)}...`);
 
     const response = await fetch(url, {
       ...options,
       method: method,
       headers: {
-        Authorization: this.oauth.toHeader(authHeader).Authorization,
+        Authorization: headerAuth.Authorization,
         "Content-Type": "application/json",
         ...options.headers,
       },
     });
+
+    console.log(`[OAuth Response] Status: ${response.status}`);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -85,6 +93,7 @@ export class TwitterClient {
         // Use raw text if not JSON
         errorDetail = errorText || errorDetail;
       }
+      console.log(`[OAuth Error] ${response.status} - ${errorDetail}`);
       throw new Error(
         `Twitter API error: ${response.status} - ${errorDetail}`
       );
@@ -100,6 +109,7 @@ export class TwitterClient {
 
   // Post a new tweet using OAuth 1.0a
   async postTweet(text: string): Promise<Tweet> {
+    console.log(`[postTweet] Posting: "${text}"`);
     const result = await this.oauth1Request<{ data: Tweet }>("/tweets", {
       method: "POST",
       body: JSON.stringify({ text }),
