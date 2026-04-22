@@ -1,3 +1,4 @@
+import OAuth from "oauth-1.0a";
 import type { Tweet, TwitterUser, SearchResponse } from "./types.js";
 import type { TwitterAccount } from "./config.js";
 
@@ -5,44 +6,26 @@ const TWITTER_API_BASE = "https://api.twitter.com/2";
 
 export class TwitterClient {
   private account: TwitterAccount;
+  private oauth: OAuth;
 
   constructor(account: TwitterAccount) {
     this.account = account;
-  }
-
-  // OAuth 1.0a signature generation
-  private async generateOAuthSignature(
-    method: string,
-    url: string,
-    params: Record<string, string>
-  ): Promise<string> {
-    const encoder = new TextEncoder();
     
-    // Sort parameters
-    const sortedParams = Object.keys(params)
-      .sort()
-      .map((k) => `${encodeURIComponent(k)}=${encodeURIComponent(params[k])}`)
-      .join("&");
-
-    const signatureBase = `${method.toUpperCase()}&${encodeURIComponent(url)}&${encodeURIComponent(sortedParams)}`;
-    
-    const key = `${encodeURIComponent(this.account.apiSecret)}&${encodeURIComponent(this.account.accessTokenSecret)}`;
-    
-    const cryptoKey = await crypto.subtle.importKey(
-      "raw",
-      encoder.encode(key),
-      { name: "HMAC", hash: "SHA-1" },
-      false,
-      ["sign"]
-    );
-    
-    const signature = await crypto.subtle.sign(
-      "HMAC",
-      cryptoKey,
-      encoder.encode(signatureBase)
-    );
-    
-    return btoa(String.fromCharCode(...new Uint8Array(signature)));
+    // Initialize OAuth 1.0a with the account credentials
+    this.oauth = new OAuth({
+      consumer: {
+        key: this.account.apiKey,
+        secret: this.account.apiSecret,
+      },
+      signature_method: "HMAC-SHA1",
+      hash_function: (baseString: string, key: string) => {
+        // Use Node.js crypto for HMAC-SHA1
+        const crypto = require("crypto");
+        const hmac = crypto.createHmac("sha1", key);
+        hmac.update(baseString);
+        return hmac.digest("base64");
+      },
+    });
   }
 
   private async oauth1Request<T>(
@@ -53,51 +36,57 @@ export class TwitterClient {
       throw new Error("OAuth 1.0a requires access token and secret.");
     }
 
-    const method = (options.method || "GET").toUpperCase();
     const url = `${TWITTER_API_BASE}${endpoint}`;
+    const method = (options.method || "GET").toUpperCase() as "GET" | "POST" | "PUT" | "DELETE";
     
-    // Parse existing query params if any
+    // Parse query parameters from URL
     const urlObj = new URL(url);
-    const queryParams: Record<string, string> = {};
+    const queryData: Record<string, string> = {};
     urlObj.searchParams.forEach((value, key) => {
-      queryParams[key] = value;
+      queryData[key] = value;
     });
 
-    // OAuth 1.0a parameters
-    const oauthParams: Record<string, string> = {
-      oauth_consumer_key: this.account.apiKey,
-      oauth_nonce: Math.random().toString(36).substring(2) + Date.now().toString(36),
-      oauth_signature_method: "HMAC-SHA1",
-      oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
-      oauth_token: this.account.accessToken,
-      oauth_version: "1.0",
-    };
+    // Generate OAuth authorization header
+    const authHeader = this.oauth.authorize(
+      {
+        url: urlObj.origin + urlObj.pathname + "?" + urlObj.searchParams.toString(),
+        method: method,
+      },
+      {
+        key: this.account.accessToken,
+        secret: this.account.accessTokenSecret,
+      }
+    );
 
-    // Combine all params for signature
-    const allParams = { ...queryParams, ...oauthParams };
-    const signature = await this.generateOAuthSignature(method, url, allParams);
-    oauthParams.oauth_signature = signature;
-
-    // Build Authorization header
-    const authHeader =
-      "OAuth " +
-      Object.keys(oauthParams)
-        .map((k) => `${encodeURIComponent(k)}="${encodeURIComponent(oauthParams[k])}"`)
-        .join(", ");
+    // For GET requests, include OAuth params in the URL
+    let finalUrl = url;
+    if (method === "GET" && Object.keys(queryData).length === 0) {
+      // Extract just the base URL without query params for GET
+      finalUrl = `${urlObj.origin}${urlObj.pathname}`;
+    }
 
     const response = await fetch(url, {
       ...options,
+      method: method,
       headers: {
-        Authorization: authHeader,
+        Authorization: this.oauth.toHeader(authHeader).Authorization,
         "Content-Type": "application/json",
         ...options.headers,
       },
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
+      const errorText = await response.text();
+      let errorDetail = response.statusText;
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorDetail = errorJson.detail || errorJson.error || errorDetail;
+      } catch {
+        // Use raw text if not JSON
+        errorDetail = errorText || errorDetail;
+      }
       throw new Error(
-        `Twitter API error: ${response.status} - ${error.detail || response.statusText}`
+        `Twitter API error: ${response.status} - ${errorDetail}`
       );
     }
 
@@ -215,43 +204,33 @@ export class TwitterClient {
     await this.oauth1Request(`/tweets/${tweetId}`, { method: "DELETE" });
   }
 
-  // Upload media (returns media ID) using OAuth 1.0a
+  // Upload media (returns media ID)
   async uploadMedia(base64Data: string): Promise<string> {
     const binaryData = Buffer.from(base64Data, "base64");
     
-    // For media upload, we use OAuth 1.0a with binary data
-    const method = "POST";
     const url = `${TWITTER_API_BASE}/media/upload`;
+    const method = "POST";
     
-    const oauthParams: Record<string, string> = {
-      oauth_consumer_key: this.account.apiKey,
-      oauth_nonce: Math.random().toString(36).substring(2) + Date.now().toString(36),
-      oauth_signature_method: "HMAC-SHA1",
-      oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
-      oauth_token: this.account.accessToken,
-      oauth_version: "1.0",
-    };
-
-    const signature = await this.generateOAuthSignature(method, url, oauthParams);
-    oauthParams.oauth_signature = signature;
-
-    const authHeader =
-      "OAuth " +
-      Object.keys(oauthParams)
-        .map((k) => `${encodeURIComponent(k)}="${encodeURIComponent(oauthParams[k])}"`)
-        .join(", ");
+    const authHeader = this.oauth.authorize(
+      { url, method },
+      {
+        key: this.account.accessToken,
+        secret: this.account.accessTokenSecret,
+      }
+    );
 
     const response = await fetch(url, {
-      method: "POST",
+      method: method,
       headers: {
-        Authorization: authHeader,
+        Authorization: this.oauth.toHeader(authHeader).Authorization,
         "Content-Type": "application/octet-stream",
       },
       body: binaryData,
     });
 
     if (!response.ok) {
-      throw new Error(`Media upload failed: ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`Media upload failed: ${response.status} - ${errorText}`);
     }
 
     const result = await response.json() as { media_id_string: string };
