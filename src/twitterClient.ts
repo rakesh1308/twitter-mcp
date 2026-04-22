@@ -1,4 +1,5 @@
 import OAuth from "oauth-1.0a";
+import * as crypto from "crypto";
 import type { Tweet, TwitterUser, SearchResponse } from "./types.js";
 import type { TwitterAccount } from "./config.js";
 
@@ -20,7 +21,6 @@ export class TwitterClient {
       signature_method: "HMAC-SHA1",
       hash_function: (baseString: string, key: string) => {
         // Use Node.js crypto for HMAC-SHA1
-        const crypto = require("crypto");
         const hmac = crypto.createHmac("sha1", key);
         hmac.update(baseString);
         return hmac.digest("base64");
