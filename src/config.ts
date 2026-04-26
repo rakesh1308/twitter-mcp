@@ -37,23 +37,6 @@ export function loadConfig(): Config {
     });
   }
 
-  // Load Account 2
-  const account2Name = process.env.ACCOUNT2_NAME || "Account 2";
-  const account2ApiKey = process.env.ACCOUNT2_API_KEY;
-  const account2ApiSecret = process.env.ACCOUNT2_API_SECRET;
-  const account2AccessToken = process.env.ACCOUNT2_ACCESS_TOKEN;
-  const account2AccessSecret = process.env.ACCOUNT2_ACCESS_TOKEN_SECRET;
-
-  if (account2ApiKey && account2ApiSecret && account2AccessToken && account2AccessSecret) {
-    accounts.push({
-      name: account2Name,
-      apiKey: account2ApiKey,
-      apiSecret: account2ApiSecret,
-      accessToken: account2AccessToken,
-      accessTokenSecret: account2AccessSecret,
-    });
-  }
-
   if (accounts.length === 0) {
     throw new Error(
       "No Twitter accounts configured. Please set ACCOUNT1_API_KEY, ACCOUNT1_API_SECRET, ACCOUNT1_ACCESS_TOKEN, and ACCOUNT1_ACCESS_TOKEN_SECRET environment variables."
