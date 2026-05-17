@@ -1,167 +1,109 @@
 # Twitter MCP Server
 
-A Model Context Protocol (MCP) server for Twitter API v2 with OAuth 1.0a authentication. Deploy to Zeabur and use with any AI client that supports MCP.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Node.js](https://img.shields.io/badge/Node.js-20%2B-green.svg)](https://nodejs.org/)
+[![MCP](https://img.shields.io/badge/MCP-Streamable%20HTTP-blue.svg)](https://modelcontextprotocol.io/)
+[![Deploy on Zeabur](https://zeabur.com/button.svg)](https://zeabur.com)
+
+A **Model Context Protocol (MCP) server** that gives AI assistants (Claude, Cursor, etc.) full Twitter/X API access via OAuth 1.0a. Deploy once to the cloud, connect from any MCP-compatible client.
+
+## What it does
+
+Let your AI assistant post tweets, reply, search, get user info, retweet, like, and delete — all from natural language. No manual API calls needed.
+
+```
+"Post a tweet saying hello from my AI assistant"
+"Search for recent tweets about Claude AI and summarize them"
+"Reply to tweet 123456 with a thank you message"
+```
 
 ## Features
 
-- **Multi-account support**: Configure up to 2 Twitter accounts
-- **OAuth 1.0a authentication**: More reliable than Bearer Token
-- **Post tweets**: Create new tweets
-- **Reply to tweets**: Reply to existing tweets
-- **Search tweets**: Search recent or all tweets
-- **Get tweet data**: Retrieve tweet details by ID
-- **User lookup**: Get user information by username
-- **User tweets**: Get recent tweets from a user
-- **Retweet/Like**: Interact with tweets
-- **Delete tweets**: Remove your tweets
-- **Streamable HTTP transport**: Works with remote MCP clients
+- **OAuth 1.0a authentication** — more reliable than Bearer Token for write operations
+- **Full tweet lifecycle** — post, reply, retweet, like, delete
+- **Search** — recent tweets or all tweets (with elevated access)
+- **User lookup** — get profile info and recent tweets by username
+- **Multi-account support** — configure up to 2 Twitter accounts and switch between them
+- **Streamable HTTP transport** — works with any remote MCP client
+- **Docker ready** — includes Dockerfile for easy deployment
 
-## Prerequisites
+## Quick Start
 
-1. Node.js 20+ installed locally
-2. Twitter Developer account with API access (Basic, Pro, or Free tier)
-3. Zeabur account for deployment
+### 1. Get Twitter API Credentials
 
-## Twitter API Setup
+1. Go to the [Twitter Developer Portal](https://developer.twitter.com/en/portal/dashboard)
+2. Create a Project and App
+3. Set App permissions to **Read and Write**
+4. Under "Keys and tokens", generate:
+   - API Key & API Secret
+   - Access Token & Access Token Secret
 
-1. Go to [Twitter Developer Portal](https://developer.twitter.com/en/portal/dashboard)
-2. Create a Project and App (required for API v2 access)
-3. Navigate to "Keys and tokens" tab for your App
-4. Generate the following credentials:
-   - **API Key** - Consumer API Key
-   - **API Secret** - Consumer API Secret
-   - **Access Token** - User Access Token (under "Authentication Tokens")
-   - **Access Token Secret** - User Access Token Secret
+### 2. Deploy to Zeabur (recommended)
 
-### Required API Permissions
-
-Make sure your app has **Read and Write** permissions in your Twitter Developer Portal:
-- **Read** - For reading tweets, searching, user info
-- **Write** - For posting, replying, deleting tweets
-
-## Local Development
-
-### 1. Install Dependencies
-
-```bash
-npm install
-```
-
-### 2. Configure Environment Variables
-
-Create a `.env` file in the root directory:
-
-```env
-# Account 1 Configuration (Required)
-ACCOUNT1_NAME=MyMainAccount
-ACCOUNT1_API_KEY=your_api_key_here
-ACCOUNT1_API_SECRET=your_api_secret_here
-ACCOUNT1_ACCESS_TOKEN=your_access_token_here
-ACCOUNT1_ACCESS_TOKEN_SECRET=your_access_token_secret_here
-
-# Account 2 Configuration (optional)
-ACCOUNT2_NAME=MySecondAccount
-ACCOUNT2_API_KEY=your_second_api_key_here
-ACCOUNT2_API_SECRET=your_second_api_secret_here
-ACCOUNT2_ACCESS_TOKEN=your_second_access_token_here
-ACCOUNT2_ACCESS_TOKEN_SECRET=your_second_access_token_secret_here
-
-# Server Configuration
-PORT=3000
-HOST=0.0.0.0
-```
-
-### 3. Run Development Server
-
-```bash
-npm run dev
-```
-
-The server will start on `http://localhost:3000`
-
-### 4. Test the Server
-
-```bash
-# Health check
-curl http://localhost:3000/health
-
-# Get server info
-curl http://localhost:3000/
-```
-
-## Deployment to Zeabur
-
-### Option 1: Deploy from GitHub
-
-1. Push your code to a GitHub repository
-2. Go to [Zeabur](https://zeabur.com) and sign in
-3. Click "Deploy New Service"
-4. Select "GitHub" and connect your repository
-5. Configure environment variables:
-   - `ACCOUNT1_API_KEY`
-   - `ACCOUNT1_API_SECRET`
-   - `ACCOUNT1_ACCESS_TOKEN`
-   - `ACCOUNT1_ACCESS_TOKEN_SECRET`
-   - (And similar for Account 2)
-6. Deploy - Zeabur will automatically detect the Node.js app and deploy it
-
-### Option 2: Deploy with Dockerfile
-
-1. The `Dockerfile` is already included in this project
-2. Upload your code to Zeabur
-3. Zeabur will use the Dockerfile to build and deploy
-
-### Environment Variables on Zeabur
-
-Configure these in Zeabur's environment variables panel:
+1. Fork this repo
+2. Go to [Zeabur](https://zeabur.com) → Deploy New Service → GitHub
+3. Select your fork
+4. Add these environment variables:
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `ACCOUNT1_API_KEY` | API Key for account 1 | Yes |
-| `ACCOUNT1_API_SECRET` | API Secret for account 1 | Yes |
-| `ACCOUNT1_ACCESS_TOKEN` | Access Token for account 1 | Yes |
-| `ACCOUNT1_ACCESS_TOKEN_SECRET` | Access Token Secret for account 1 | Yes |
-| `ACCOUNT2_API_KEY` | API Key for account 2 | If using 2nd account |
-| `ACCOUNT2_API_SECRET` | API Secret for account 2 | If using 2nd account |
-| `ACCOUNT2_ACCESS_TOKEN` | Access Token for account 2 | If using 2nd account |
-| `ACCOUNT2_ACCESS_TOKEN_SECRET` | Access Token Secret for account 2 | If using 2nd account |
+| `ACCOUNT1_NAME` | Display name for account 1 | Yes |
+| `ACCOUNT1_API_KEY` | API Key | Yes |
+| `ACCOUNT1_API_SECRET` | API Secret | Yes |
+| `ACCOUNT1_ACCESS_TOKEN` | Access Token | Yes |
+| `ACCOUNT1_ACCESS_TOKEN_SECRET` | Access Token Secret | Yes |
+| `ACCOUNT2_NAME` | Display name for account 2 | No |
+| `ACCOUNT2_API_KEY` | API Key for account 2 | No |
+| `ACCOUNT2_API_SECRET` | API Secret for account 2 | No |
+| `ACCOUNT2_ACCESS_TOKEN` | Access Token for account 2 | No |
+| `ACCOUNT2_ACCESS_TOKEN_SECRET` | Access Token Secret for account 2 | No |
 | `PORT` | Server port (default: 3000) | No |
 
-## AI Client Configuration
+5. Deploy — Zeabur detects Node.js automatically and builds from the Dockerfile
 
-### Claude Desktop
+### 3. Connect your AI Client
 
-Add to your `claude_desktop_config.json`:
-
+**Claude Desktop** — add to `claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
     "twitter": {
       "type": "streamable-http",
-      "url": "https://your-zeabur-app.zeabur.app/mcp"
+      "url": "https://your-app.zeabur.app/mcp"
     }
   }
 }
 ```
 
-### Cursor
-
-Add to Cursor's MCP settings:
-
+**Cursor** — add to MCP settings:
 ```json
 {
   "mcpServers": {
     "twitter": {
       "type": "streamable-http",
-      "url": "https://your-zeabur-app.zeabur.app/mcp"
+      "url": "https://your-app.zeabur.app/mcp"
     }
   }
 }
 ```
 
-### Other MCP Clients
+Any MCP client that supports `streamable-http` transport works with the same URL pattern.
 
-Use the URL format: `https://your-zeabur-app.zeabur.app/mcp` with transport type `streamable-http`.
+## Local Development
+
+```bash
+# Install dependencies
+npm install
+
+# Copy example env and fill in your credentials
+cp .env.example .env
+
+# Start dev server (with hot reload)
+npm run dev
+
+# Verify it's running
+curl http://localhost:3000/health
+```
 
 ## Available Tools
 
@@ -171,51 +113,13 @@ Use the URL format: `https://your-zeabur-app.zeabur.app/mcp` with transport type
 | `reply_to_tweet` | Reply to a tweet | `tweet_id`, `text`, `account` (optional) |
 | `get_tweet` | Get tweet details | `tweet_id` |
 | `search_tweets` | Search recent tweets | `query`, `max_results` (optional) |
-| `search_all_tweets` | Search all tweets | `query`, `max_results` (optional) |
-| `get_user` | Get user info | `username` |
-| `get_user_tweets` | Get user's tweets | `username`, `max_results` (optional) |
+| `search_all_tweets` | Search all tweets (elevated access) | `query`, `max_results` (optional) |
+| `get_user` | Get user profile | `username` |
+| `get_user_tweets` | Get a user's recent tweets | `username`, `max_results` (optional) |
 | `retweet` | Retweet a tweet | `tweet_id`, `user_id`, `account` (optional) |
 | `like_tweet` | Like a tweet | `tweet_id`, `user_id`, `account` (optional) |
 | `delete_tweet` | Delete a tweet | `tweet_id`, `account` (optional) |
-| `list_accounts` | List configured accounts | none |
-
-## Example Usage
-
-### Post a tweet
-```
-Use post_tweet with {"text": "Hello from MCP!", "account": "MyMainAccount"}
-```
-
-### Reply to a tweet
-```
-Use reply_to_tweet with {"tweet_id": "123456789", "text": "Great post!", "account": "MyMainAccount"}
-```
-
-### Search for tweets
-```
-Use search_tweets with {"query": "AI", "max_results": 10}
-```
-
-### Get user info
-```
-Use get_user with {"username": "twitterdev"}
-```
-
-## Project Structure
-
-```
-twitter-mcp/
-├── src/
-│   ├── index.ts       # Main MCP server with Express
-│   ├── config.ts      # Configuration loader
-│   ├── twitterClient.ts  # Twitter API client with OAuth 1.0a
-│   └── types.ts       # TypeScript types
-├── Dockerfile         # Docker deployment
-├── package.json       # Dependencies
-├── tsconfig.json      # TypeScript config
-├── .env.example      # Example environment file
-└── README.md          # This file
-```
+| `list_accounts` | List configured accounts | — |
 
 ## API Endpoints
 
@@ -225,26 +129,38 @@ twitter-mcp/
 | `/health` | GET | Health check |
 | `/mcp` | GET/POST | MCP protocol endpoint |
 
+## Project Structure
+
+```
+twitter-mcp/
+├── src/
+│   ├── index.ts          # MCP server + Express app
+│   ├── config.ts         # Environment variable loader
+│   ├── twitterClient.ts  # Twitter API client (OAuth 1.0a)
+│   └── types.ts          # TypeScript types
+├── Dockerfile
+├── package.json
+├── tsconfig.json
+├── .env.example
+└── README.md
+```
+
 ## Troubleshooting
 
-### "No Twitter accounts configured" error
-- Ensure your `.env` file exists and has all 4 required variables for ACCOUNT1
-- Check for typos in variable names
-- All four are required: API_KEY, API_SECRET, ACCESS_TOKEN, ACCESS_TOKEN_SECRET
+**"No Twitter accounts configured"**
+- Ensure `.env` exists with all 4 required `ACCOUNT1_*` variables
 
-### "OAuth 1.0a requires access token and secret" error
-- Make sure you have provided ACCESS_TOKEN and ACCESS_TOKEN_SECRET
-- These are different from API Key/Secret
+**"OAuth 1.0a requires access token and secret"**
+- `ACCESS_TOKEN` and `ACCESS_TOKEN_SECRET` are different from `API_KEY`/`API_SECRET` — generate them separately in the developer portal
 
-### 403 Forbidden error
-- Ensure your App is attached to a Project
-- Verify your App has Read+Write permissions
-- Check that your Access Token has the right permissions
+**403 Forbidden**
+- Make sure your App is attached to a Project in the developer portal
+- Verify App permissions are set to **Read and Write**
+- Regenerate Access Tokens *after* changing permissions (old tokens don't pick up new permissions)
 
-### Rate limiting
-- Twitter API has rate limits (varies by endpoint and tier)
-- Free tier: ~450 requests per 15 minutes
-- Implement exponential backoff for retry logic if needed
+**Rate limiting**
+- Free tier: ~450 requests per 15 minutes per endpoint
+- Basic/Pro tiers have higher limits — check the [Twitter API docs](https://developer.twitter.com/en/docs/twitter-api/rate-limits)
 
 ## License
 

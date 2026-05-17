@@ -28,8 +28,6 @@ export class TwitterClient {
     });
     
     console.log(`[TwitterClient] Initialized for account: ${account.name}`);
-    console.log(`[TwitterClient] API Key: ${account.apiKey.substring(0, 10)}...`);
-    console.log(`[TwitterClient] Access Token: ${account.accessToken.substring(0, 20)}...`);
   }
 
   private async oauth1Request<T>(
@@ -63,13 +61,8 @@ export class TwitterClient {
       secret: this.account.accessTokenSecret,
     };
     
-    console.log(`[OAuth] Auth URL: ${authData.url}`);
-    console.log(`[OAuth] Token Key: ${token.key.substring(0, 20)}...`);
-    
     const authHeader = this.oauth.authorize(authData, token);
     const headerAuth = this.oauth.toHeader(authHeader);
-    
-    console.log(`[OAuth] Authorization: ${headerAuth.Authorization.substring(0, 50)}...`);
 
     const response = await fetch(url, {
       ...options,
