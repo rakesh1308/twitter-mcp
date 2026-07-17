@@ -1,4 +1,4 @@
-# Twitter MCP Server
+# Twitter MCP Server (Python)
 
 Model Context Protocol (MCP) server for the Twitter/X API v2. Single account, OAuth 1.0a for read/write, with optional OAuth 2.0 for follow/explore tools. Deploys cleanly to Zeabur.
 
@@ -20,7 +20,7 @@ OAuth 1.0a (always required):
 | `reply_to_tweet` | Reply to a tweet | `tweet_id`, `text` |
 | `get_tweet` | Get tweet details | `tweet_id` |
 | `search_tweets` | Search recent tweets | `query`, `max_results?` |
-| `search_all_tweets` | Search all tweets (elevated API access) | `query`, `max_results?` |
+| `search_all_tweets` | Search all tweets (elevated access) | `query`, `max_results?` |
 | `get_user` | Get user info | `username` |
 | `get_user_tweets` | Get a user's recent tweets | `username`, `max_results?` |
 | `retweet` | Retweet a tweet | `tweet_id`, `user_id` |
@@ -59,7 +59,6 @@ OAuth 2.0 (optional — requires `TWITTER_OAUTH2_*` env vars):
 | `TWITTER_OAUTH2_CLIENT_SECRET` | App's OAuth 2.0 Client Secret |
 | `TWITTER_OAUTH2_ACCESS_TOKEN` | Bootstrap access token |
 | `TWITTER_OAUTH2_REFRESH_TOKEN` | Bootstrap refresh token |
-| `TWITTER_OAUTH2_EXPIRES_AT` | ISO timestamp or epoch seconds |
 | `TWITTER_OAUTH2_SCOPE` | e.g. `tweet.read users.read follows.read follows.write offline.access` |
 | `TWITTER_OAUTH2_TOKEN_FILE` | Default `/data/oauth2.json` — **must be on a persistent volume** |
 | `OAUTH2_REFRESH_SKEW_SECONDS` | Default `60` |
@@ -70,9 +69,10 @@ Tokens auto-refresh on expiry and persist to `TWITTER_OAUTH2_TOKEN_FILE`. On Zea
 
 1. Push to GitHub.
 2. Zeabur → **Deploy New Service → GitHub** → select repo.
-3. Add the four `TWITTER_*` variables above (and the OAuth 2.0 set if you want follow/explore).
-4. Add a **Persistent Volume** mounted at `/data`.
-5. Deploy. Public URL is `https://<project>.zeabur.app`.
+3. Zeabur auto-detects Python (uses the Dockerfile).
+4. Add the four `TWITTER_*` variables above (and the OAuth 2.0 set if you want follow/explore).
+5. Add a **Persistent Volume** mounted at `/data`.
+6. Deploy. Public URL is `https://<project>.zeabur.app`.
 
 ## Connect from an MCP client
 
@@ -92,27 +92,32 @@ Streamable HTTP at `/mcp`:
 ## Local development
 
 ```bash
+python -m venv .venv
+.venv\Scripts\Activate.ps1   # or: source .venv/bin/activate
+pip install -e .
+
 TWITTER_API_KEY=... \
 TWITTER_API_SECRET=... \
 TWITTER_ACCESS_TOKEN=... \
 TWITTER_ACCESS_TOKEN_SECRET=... \
-npm run dev
+python -m twitter_mcp
 ```
 
 ## Project layout
 
 ```
 twitter-mcp/
-├── src/
-│   ├── config.ts         # env → typed config
-│   ├── index.ts          # Express server + MCP JSON-RPC
-│   ├── oauth2Client.ts   # OAuth 2.0 + token persistence + auto-refresh
-│   ├── twitterClient.ts  # OAuth 1.0a Twitter API v2 client
-│   └── types.ts          # Shared types
+├── src/twitter_mcp/
+│   ├── __init__.py
+│   ├── __main__.py
+│   ├── config.py        # env → typed config
+│   ├── oauth1.py        # OAuth 1.0a Twitter client (httpx + authlib)
+│   ├── oauth2.py        # OAuth 2.0 + token persistence + auto-refresh
+│   └── server.py        # Starlette + JSON-RPC at /mcp
 ├── Dockerfile
 ├── .dockerignore
-├── package.json
-├── tsconfig.json
+├── pyproject.toml
+├── .env.example
 └── README.md
 ```
 

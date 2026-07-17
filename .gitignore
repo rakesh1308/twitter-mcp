@@ -1,8 +1,15 @@
 # Dependencies
 node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
 
 # Build output
 dist/
+build/
 
 # Environment files
 .env

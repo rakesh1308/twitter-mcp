@@ -1,22 +1,16 @@
-# Use Node.js 20 LTS
-FROM node:20-alpine
+FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install dependencies (full set needed for tsc)
-COPY package*.json ./
-RUN npm install
+RUN pip install --no-cache-dir -U pip
 
-# Build TypeScript
-COPY tsconfig.json ./
+COPY pyproject.toml ./
 COPY src ./src
-RUN npm run build
+RUN pip install --no-cache-dir .
 
-# Drop dev deps for runtime
-RUN npm prune --production
-
-ENV NODE_ENV=production
+ENV PYTHONUNBUFFERED=1
 ENV HOST=0.0.0.0
-# Do NOT hardcode PORT — let Zeabur inject it.
 
-CMD ["node", "dist/index.js"]
+EXPOSE 3000
+
+CMD ["python", "-m", "twitter_mcp"]
