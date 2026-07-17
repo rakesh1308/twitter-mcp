@@ -1,31 +1,22 @@
 # Use Node.js 20 LTS
 FROM node:20-alpine
 
-# Set working directory
 WORKDIR /app
 
-# Copy package files
+# Install dependencies (full set needed for tsc)
 COPY package*.json ./
-
-# Install ALL dependencies (including devDependencies for build)
 RUN npm install
 
-# Copy application code
-COPY . .
-
 # Build TypeScript
+COPY tsconfig.json ./
+COPY src ./src
 RUN npm run build
 
-# Remove devDependencies to reduce image size
+# Drop dev deps for runtime
 RUN npm prune --production
 
-# Expose port
-EXPOSE 3000
-
-# Set environment variables
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
-ENV PORT=3000
+# Do NOT hardcode PORT — let Zeabur inject it.
 
-# Run the application
 CMD ["node", "dist/index.js"]

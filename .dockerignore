@@ -1,0 +1,11 @@
+node_modules
+dist
+.git
+.claude
+*.log
+.env
+.env.local
+.env.production
+.DS_Store
+Thumbs.db
+README.md

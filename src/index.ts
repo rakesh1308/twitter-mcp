@@ -1,732 +1,210 @@
-import "dotenv/config";
 import express, { Request, Response } from "express";
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import {
-  CallToolRequest,
-  ListToolsRequestSchema,
-  CallToolRequestSchema,
-} from "@modelcontextprotocol/sdk/types.js";
 import { loadConfig } from "./config.js";
 import { TwitterClient } from "./twitterClient.js";
+import { OAuth2Client } from "./oauth2Client.js";
 
-// Load configuration
 const config = loadConfig();
+const client = new TwitterClient(config.account);
+const oauth2 = OAuth2Client.fromEnv();
 
-// Create Twitter clients for each account
-const clients: TwitterClient[] = config.accounts.map(
-  (account) => new TwitterClient(account)
-);
-
-// Create Express app
 const app = express();
 app.use(express.json());
 
-// Health check endpoint
-app.get("/health", (req: Request, res: Response) => {
+app.get("/health", (_req: Request, res: Response) => {
   res.json({
     status: "healthy",
-    accounts: clients.map((c) => c.getAccountName()),
+    account: client.getAccountName(),
+    oauth2: oauth2 ? "configured" : "disabled",
     timestamp: new Date().toISOString(),
   });
 });
 
-// Root endpoint for info
-app.get("/", (req: Request, res: Response) => {
+app.get("/", (_req: Request, res: Response) => {
   res.json({
     name: "Twitter MCP Server",
     version: "1.0.0",
-    description: "MCP server for Twitter API v2 with Streamable HTTP transport",
-    accounts: clients.map((c) => c.getAccountName()),
-    endpoints: {
-      health: "/health",
-      mcp: "/mcp",
-    },
+    description: "MCP server for Twitter API v2 (OAuth 1.0a + optional OAuth 2.0)",
+    account: client.getAccountName(),
+    oauth2: oauth2 ? "configured" : "disabled",
+    endpoints: { health: "/health", mcp: "/mcp" },
   });
 });
 
-// Parse account from request
-function getAccountClient(accountName?: string): TwitterClient {
-  if (!accountName) {
-    return clients[0];
+type ToolResult = { content: Array<{ type: "text"; text: string }>; isError?: boolean };
+type ToolCallParams = { name?: string; arguments?: Record<string, unknown> };
+
+async function handleToolCall(params: ToolCallParams): Promise<ToolResult> {
+  const { name, arguments: args } = params;
+  if (!name) return err("No tool name provided");
+
+  try {
+    switch (name) {
+      case "post_tweet":
+        return ok(await client.postTweet(args!.text as string));
+      case "reply_to_tweet":
+        return ok(await client.replyToTweet(args!.tweet_id as string, args!.text as string));
+      case "get_tweet":
+        return ok(await client.getTweet(args!.tweet_id as string));
+      case "search_tweets":
+        return ok(await client.searchTweets(args!.query as string, args!.max_results as number));
+      case "search_all_tweets":
+        return ok(await client.searchAllTweets(args!.query as string, args!.max_results as number));
+      case "get_user":
+        return ok(await client.getUserByUsername(args!.username as string));
+      case "get_user_tweets": {
+        const user = await client.getUserByUsername(args!.username as string);
+        return ok(await client.getUserTweets(user.id, args!.max_results as number));
+      }
+      case "retweet":
+        await client.retweet(args!.tweet_id as string, args!.user_id as string);
+        return ok({ success: true, message: `Retweeted ${args!.tweet_id}` });
+      case "like_tweet":
+        await client.likeTweet(args!.tweet_id as string, args!.user_id as string);
+        return ok({ success: true, message: `Liked ${args!.tweet_id}` });
+      case "delete_tweet":
+        await client.deleteTweet(args!.tweet_id as string);
+        return ok({ success: true, message: `Deleted ${args!.tweet_id}` });
+      case "list_accounts":
+        return ok({ account: client.getAccountName() });
+      case "follow_user":
+        requireOAuth2();
+        await oauth2!.followUser((await client.getMe()).id, args!.user_id as string);
+        return ok({ success: true, followed: args!.user_id });
+      case "unfollow_user":
+        requireOAuth2();
+        await oauth2!.unfollowUser((await client.getMe()).id, args!.user_id as string);
+        return ok({ success: true, unfollowed: args!.user_id });
+      case "get_following":
+        requireOAuth2();
+        return ok(await oauth2!.getFollowing((await client.getMe()).id, args!.max_results as number | undefined, args!.pagination_token as string | undefined));
+      case "get_followers":
+        requireOAuth2();
+        return ok(await oauth2!.getFollowers((await client.getMe()).id, args!.max_results as number | undefined, args!.pagination_token as string | undefined));
+      default:
+        return err(`Unknown tool: ${name}`);
+    }
+  } catch (e) {
+    return err(e instanceof Error ? e.message : String(e));
   }
-  const client = clients.find((c) => c.getAccountName() === accountName);
-  if (!client) {
-    throw new Error(
-      `Account '${accountName}' not found. Available accounts: ${clients
-        .map((c) => c.getAccountName())
-        .join(", ")}`
-    );
-  }
-  return client;
 }
 
-// Create MCP server
-const server = new Server(
-  {
-    name: "twitter-mcp-server",
-    version: "1.0.0",
-  },
-  {
-    capabilities: {
-      tools: {},
-    },
-  }
-);
+function ok(payload: unknown): ToolResult {
+  const formatted = typeof payload === "string" ? payload : JSON.stringify(payload, null, 2);
+  return { content: [{ type: "text", text: formatted }] };
+}
 
-// Define all the MCP tools
+function err(message: string): ToolResult {
+  return { content: [{ type: "text", text: JSON.stringify({ error: message }) }], isError: true };
+}
+
+function requireOAuth2(): void {
+  if (!oauth2) throw new Error("OAuth 2.0 not configured. Set TWITTER_OAUTH2_* env vars.");
+}
+
 const tools = [
-  // Post a new tweet
-  {
-    name: "post_tweet",
-    description: "Post a new tweet to Twitter",
-    inputSchema: {
-      type: "object",
-      properties: {
-        text: {
-          type: "string",
-          description: "The text content of the tweet (max 280 characters)",
-        },
-        account: {
-          type: "string",
-          description:
-            "Account name to use (optional, defaults to first account)",
-        },
-      },
-      required: ["text"],
-    },
-  },
-  // Reply to a tweet
-  {
-    name: "reply_to_tweet",
-    description: "Reply to an existing tweet",
-    inputSchema: {
-      type: "object",
-      properties: {
-        tweet_id: {
-          type: "string",
-          description: "The ID of the tweet to reply to",
-        },
-        text: {
-          type: "string",
-          description: "The text content of your reply (max 280 characters)",
-        },
-        account: {
-          type: "string",
-          description:
-            "Account name to use (optional, defaults to first account)",
-        },
-      },
-      required: ["tweet_id", "text"],
-    },
-  },
-  // Get tweet by ID
-  {
-    name: "get_tweet",
-    description: "Get details of a specific tweet by its ID",
-    inputSchema: {
-      type: "object",
-      properties: {
-        tweet_id: {
-          type: "string",
-          description: "The ID of the tweet to retrieve",
-        },
-      },
-      required: ["tweet_id"],
-    },
-  },
-  // Search tweets
-  {
-    name: "search_tweets",
-    description: "Search for recent tweets matching a query",
-    inputSchema: {
-      type: "object",
-      properties: {
-        query: {
-          type: "string",
-          description:
-            "Search query (supports Twitter search operators like 'from:', 'has:images', etc.)",
-        },
-        max_results: {
-          type: "number",
-          description: "Maximum number of results (1-100, default: 10)",
-          default: 10,
-        },
-      },
-      required: ["query"],
-    },
-  },
-  // Search all tweets (requires elevated access)
-  {
-    name: "search_all_tweets",
-    description: "Search across all tweets (requires elevated API access)",
-    inputSchema: {
-      type: "object",
-      properties: {
-        query: {
-          type: "string",
-          description: "Search query",
-        },
-        max_results: {
-          type: "number",
-          description: "Maximum number of results (1-100, default: 10)",
-          default: 10,
-        },
-      },
-      required: ["query"],
-    },
-  },
-  // Get user by username
-  {
-    name: "get_user",
-    description: "Get Twitter user information by username",
-    inputSchema: {
-      type: "object",
-      properties: {
-        username: {
-          type: "string",
-          description: "The Twitter username (without @)",
-        },
-      },
-      required: ["username"],
-    },
-  },
-  // Get user tweets
-  {
-    name: "get_user_tweets",
-    description: "Get recent tweets from a specific user",
-    inputSchema: {
-      type: "object",
-      properties: {
-        username: {
-          type: "string",
-          description: "The Twitter username (without @)",
-        },
-        max_results: {
-          type: "number",
-          description: "Maximum number of results (1-100, default: 10)",
-          default: 10,
-        },
-      },
-      required: ["username"],
-    },
-  },
-  // Retweet
-  {
-    name: "retweet",
-    description: "Retweet an existing tweet",
-    inputSchema: {
-      type: "object",
-      properties: {
-        tweet_id: {
-          type: "string",
-          description: "The ID of the tweet to retweet",
-        },
-        user_id: {
-          type: "string",
-          description:
-            "Your Twitter user ID (required for retweeting, get from get_user)",
-        },
-        account: {
-          type: "string",
-          description:
-            "Account name to use (optional, defaults to first account)",
-        },
-      },
-      required: ["tweet_id", "user_id"],
-    },
-  },
-  // Like tweet
-  {
-    name: "like_tweet",
-    description: "Like a tweet",
-    inputSchema: {
-      type: "object",
-      properties: {
-        tweet_id: {
-          type: "string",
-          description: "The ID of the tweet to like",
-        },
-        user_id: {
-          type: "string",
-          description:
-            "Your Twitter user ID (required for liking, get from get_user)",
-        },
-        account: {
-          type: "string",
-          description:
-            "Account name to use (optional, defaults to first account)",
-        },
-      },
-      required: ["tweet_id", "user_id"],
-    },
-  },
-  // Delete tweet
-  {
-    name: "delete_tweet",
-    description: "Delete one of your tweets",
-    inputSchema: {
-      type: "object",
-      properties: {
-        tweet_id: {
-          type: "string",
-          description: "The ID of the tweet to delete",
-        },
-        account: {
-          type: "string",
-          description:
-            "Account name to use (optional, defaults to first account)",
-        },
-      },
-      required: ["tweet_id"],
-    },
-  },
-  // List accounts
-  {
-    name: "list_accounts",
-    description: "List all configured Twitter accounts",
-    inputSchema: {
-      type: "object",
-      properties: {},
-    },
-  },
+  tool("post_tweet", "Post a new tweet", { text: str("Tweet text (max 280 chars)") }, ["text"]),
+  tool("reply_to_tweet", "Reply to a tweet", {
+    tweet_id: str("ID of the tweet to reply to"),
+    text: str("Reply text (max 280 chars)"),
+  }, ["tweet_id", "text"]),
+  tool("get_tweet", "Get tweet details", { tweet_id: str("Tweet ID") }, ["tweet_id"]),
+  tool("search_tweets", "Search recent tweets (last 7 days)", {
+    query: str("Search query"),
+    max_results: num("1-100, default 10", 10),
+  }, ["query"]),
+  tool("search_all_tweets", "Search all tweets (elevated API access required)", {
+    query: str("Search query"),
+    max_results: num("1-100, default 10", 10),
+  }, ["query"]),
+  tool("get_user", "Get user info by username", { username: str("Twitter username, no @") }, ["username"]),
+  tool("get_user_tweets", "Get recent tweets from a user", {
+    username: str("Twitter username, no @"),
+    max_results: num("1-100, default 10", 10),
+  }, ["username"]),
+  tool("retweet", "Retweet a tweet", {
+    tweet_id: str("Tweet ID to retweet"),
+    user_id: str("Your numeric Twitter user ID (get from get_user)"),
+  }, ["tweet_id", "user_id"]),
+  tool("like_tweet", "Like a tweet", {
+    tweet_id: str("Tweet ID to like"),
+    user_id: str("Your numeric Twitter user ID (get from get_user)"),
+  }, ["tweet_id", "user_id"]),
+  tool("delete_tweet", "Delete one of your tweets", { tweet_id: str("Tweet ID to delete") }, ["tweet_id"]),
+  tool("list_accounts", "Show configured account", {}, []),
+  tool("follow_user", "Follow a user (OAuth 2.0)", {
+    user_id: str("Numeric Twitter user ID to follow"),
+  }, ["user_id"]),
+  tool("unfollow_user", "Unfollow a user (OAuth 2.0)", {
+    user_id: str("Numeric Twitter user ID to unfollow"),
+  }, ["user_id"]),
+  tool("get_following", "List accounts you follow (OAuth 2.0)", {
+    max_results: num("1-1000, default 100", 100),
+    pagination_token: str("Pagination token from previous response"),
+  }, []),
+  tool("get_followers", "List accounts following you (OAuth 2.0)", {
+    max_results: num("1-1000, default 100", 100),
+    pagination_token: str("Pagination token from previous response"),
+  }, []),
 ];
 
-// Register tools with the server
-server.setRequestHandler(ListToolsRequestSchema, async () => {
+function str(description: string) {
+  return { type: "string" as const, description };
+}
+function num(description: string, dflt: number) {
+  return { type: "number" as const, description, default: dflt };
+}
+function tool(name: string, description: string, properties: Record<string, unknown>, required: string[]) {
   return {
-    tools: tools.map((tool) => ({
-      name: tool.name,
-      description: tool.description,
-      inputSchema: tool.inputSchema,
-    })),
+    name,
+    description,
+    inputSchema: { type: "object" as const, properties, ...(required.length ? { required } : {}) },
   };
-});
-
-// Handle tool calls
-server.setRequestHandler(CallToolRequestSchema, async (request: CallToolRequest) => {
-  const { name, arguments: args } = request.params;
-
-  try {
-    switch (name) {
-      case "post_tweet": {
-        const client = getAccountClient(args?.account as string | undefined);
-        const tweet = await client.postTweet(args!.text as string);
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(
-                {
-                  success: true,
-                  tweet_id: tweet.id,
-                  text: tweet.text,
-                  created_at: tweet.created_at,
-                  url: `https://twitter.com/i/web/status/${tweet.id}`,
-                },
-                null,
-                2
-              ),
-            },
-          ],
-        };
-      }
-
-      case "reply_to_tweet": {
-        const client = getAccountClient(args?.account as string | undefined);
-        const tweet = await client.replyToTweet(
-          args!.tweet_id as string,
-          args!.text as string
-        );
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(
-                {
-                  success: true,
-                  tweet_id: tweet.id,
-                  text: tweet.text,
-                  created_at: tweet.created_at,
-                  url: `https://twitter.com/i/web/status/${tweet.id}`,
-                },
-                null,
-                2
-              ),
-            },
-          ],
-        };
-      }
-
-      case "get_tweet": {
-        const client = getAccountClient();
-        const tweet = await client.getTweet(args!.tweet_id as string);
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(tweet, null, 2),
-            },
-          ],
-        };
-      }
-
-      case "search_tweets": {
-        const client = getAccountClient();
-        const results = await client.searchTweets(
-          args!.query as string,
-          args!.max_results as number
-        );
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(
-                {
-                  count: results.data.length,
-                  tweets: results.data.map((t) => ({
-                    id: t.id,
-                    text: t.text,
-                    author_id: t.author_id,
-                    created_at: t.created_at,
-                    public_metrics: t.public_metrics,
-                  })),
-                },
-                null,
-                2
-              ),
-            },
-          ],
-        };
-      }
-
-      case "search_all_tweets": {
-        const client = getAccountClient();
-        const results = await client.searchAllTweets(
-          args!.query as string,
-          args!.max_results as number
-        );
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(
-                {
-                  count: results.data.length,
-                  tweets: results.data.map((t) => ({
-                    id: t.id,
-                    text: t.text,
-                    author_id: t.author_id,
-                    created_at: t.created_at,
-                    public_metrics: t.public_metrics,
-                  })),
-                },
-                null,
-                2
-              ),
-            },
-          ],
-        };
-      }
-
-      case "get_user": {
-        const client = getAccountClient();
-        const user = await client.getUserByUsername(args!.username as string);
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(user, null, 2),
-            },
-          ],
-        };
-      }
-
-      case "get_user_tweets": {
-        const client = getAccountClient();
-        // First get the user ID from username
-        const user = await client.getUserByUsername(args!.username as string);
-        const tweets = await client.getUserTweets(
-          user.id,
-          args!.max_results as number
-        );
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(
-                {
-                  user: user.username,
-                  user_id: user.id,
-                  count: tweets.data.length,
-                  tweets: tweets.data.map((t) => ({
-                    id: t.id,
-                    text: t.text,
-                    created_at: t.created_at,
-                    public_metrics: t.public_metrics,
-                  })),
-                },
-                null,
-                2
-              ),
-            },
-          ],
-        };
-      }
-
-      case "retweet": {
-        const client = getAccountClient(args?.account as string | undefined);
-        await client.retweet(args!.tweet_id as string, args!.user_id as string);
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify({
-                success: true,
-                message: `Successfully retweeted tweet ${args!.tweet_id}`,
-              }),
-            },
-          ],
-        };
-      }
-
-      case "like_tweet": {
-        const client = getAccountClient(args?.account as string | undefined);
-        await client.likeTweet(args!.tweet_id as string, args!.user_id as string);
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify({
-                success: true,
-                message: `Successfully liked tweet ${args!.tweet_id}`,
-              }),
-            },
-          ],
-        };
-      }
-
-      case "delete_tweet": {
-        const client = getAccountClient(args?.account as string | undefined);
-        await client.deleteTweet(args!.tweet_id as string);
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify({
-                success: true,
-                message: `Successfully deleted tweet ${args!.tweet_id}`,
-              }),
-            },
-          ],
-        };
-      }
-
-      case "list_accounts": {
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify({
-                accounts: clients.map((c) => ({
-                  name: c.getAccountName(),
-                })),
-                default_account: clients[0]?.getAccountName(),
-              }),
-            },
-          ],
-        };
-      }
-
-      default:
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify({ error: `Unknown tool: ${name}` }),
-            },
-          ],
-          isError: true,
-        };
-    }
-  } catch (error) {
-    return {
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify({
-            error: error instanceof Error ? error.message : String(error),
-          }),
-        },
-      ],
-      isError: true,
-    };
-  }
-});
-
-// MCP endpoint handler using Express
-app.all("/mcp", async (req: Request, res: Response) => {
-  try {
-    // Handle JSON body
-    const body = req.body;
-    
-    // Determine the method based on request
-    let response: unknown;
-    
-    if (body && body.method) {
-      // This is a JSON-RPC request
-      switch (body.method) {
-        case "initialize":
-          response = {
-            jsonrpc: "2.0",
-            id: body.id,
-            result: {
-              protocolVersion: "2025-03-26",
-              capabilities: { tools: {} },
-              serverInfo: { name: "twitter-mcp-server", version: "1.0.0" },
-            },
-          };
-          break;
-        case "tools/list":
-          response = {
-            jsonrpc: "2.0",
-            id: body.id,
-            result: {
-              tools: tools.map((tool) => ({
-                name: tool.name,
-                description: tool.description,
-                inputSchema: tool.inputSchema,
-              })),
-            },
-          };
-          break;
-        case "tools/call":
-          const toolResult = await handleToolCall(body.params);
-          response = {
-            jsonrpc: "2.0",
-            id: body.id,
-            result: toolResult,
-          };
-          break;
-        default:
-          response = {
-            jsonrpc: "2.0",
-            id: body.id,
-            error: { code: -32601, message: "Method not found" },
-          };
-      }
-    } else {
-      response = { error: "Invalid request" };
-    }
-    
-    res.json(response);
-  } catch (error) {
-    console.error("MCP handler error:", error);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// Helper function to handle tool calls
-async function handleToolCall(params: { name?: string; arguments?: Record<string, unknown> }) {
-  const { name, arguments: args } = params;
-  
-  if (!name) {
-    return { content: [{ type: "text", text: JSON.stringify({ error: "No tool name provided" }) }], isError: true };
-  }
-
-  try {
-    switch (name) {
-      case "post_tweet": {
-        const client = getAccountClient(args?.account as string | undefined);
-        const tweet = await client.postTweet(args!.text as string);
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify({
-                success: true,
-                tweet_id: tweet.id,
-                text: tweet.text,
-                created_at: tweet.created_at,
-                url: `https://twitter.com/i/web/status/${tweet.id}`,
-              }, null, 2),
-            },
-          ],
-        };
-      }
-      case "reply_to_tweet": {
-        const client = getAccountClient(args?.account as string | undefined);
-        const tweet = await client.replyToTweet(args!.tweet_id as string, args!.text as string);
-        return {
-          content: [{ type: "text", text: JSON.stringify({ success: true, tweet_id: tweet.id, text: tweet.text, created_at: tweet.created_at, url: `https://twitter.com/i/web/status/${tweet.id}` }, null, 2) }],
-        };
-      }
-      case "get_tweet": {
-        const client = getAccountClient();
-        const tweet = await client.getTweet(args!.tweet_id as string);
-        return { content: [{ type: "text", text: JSON.stringify(tweet, null, 2) }] };
-      }
-      case "search_tweets": {
-        const client = getAccountClient();
-        const results = await client.searchTweets(args!.query as string, args!.max_results as number);
-        return { content: [{ type: "text", text: JSON.stringify({ count: results.data.length, tweets: results.data.map((t) => ({ id: t.id, text: t.text, author_id: t.author_id, created_at: t.created_at, public_metrics: t.public_metrics })) }, null, 2) }] };
-      }
-      case "search_all_tweets": {
-        const client = getAccountClient();
-        const results = await client.searchAllTweets(args!.query as string, args!.max_results as number);
-        return { content: [{ type: "text", text: JSON.stringify({ count: results.data.length, tweets: results.data.map((t) => ({ id: t.id, text: t.text, author_id: t.author_id, created_at: t.created_at, public_metrics: t.public_metrics })) }, null, 2) }] };
-      }
-      case "get_user": {
-        const client = getAccountClient();
-        const user = await client.getUserByUsername(args!.username as string);
-        return { content: [{ type: "text", text: JSON.stringify(user, null, 2) }] };
-      }
-      case "get_user_tweets": {
-        const client = getAccountClient();
-        const user = await client.getUserByUsername(args!.username as string);
-        const tweets = await client.getUserTweets(user.id, args!.max_results as number);
-        return { content: [{ type: "text", text: JSON.stringify({ user: user.username, user_id: user.id, count: tweets.data.length, tweets: tweets.data.map((t) => ({ id: t.id, text: t.text, created_at: t.created_at, public_metrics: t.public_metrics })) }, null, 2) }] };
-      }
-      case "retweet": {
-        const client = getAccountClient(args?.account as string | undefined);
-        await client.retweet(args!.tweet_id as string, args!.user_id as string);
-        return { content: [{ type: "text", text: JSON.stringify({ success: true, message: `Successfully retweeted tweet ${args!.tweet_id}` }) }] };
-      }
-      case "like_tweet": {
-        const client = getAccountClient(args?.account as string | undefined);
-        await client.likeTweet(args!.tweet_id as string, args!.user_id as string);
-        return { content: [{ type: "text", text: JSON.stringify({ success: true, message: `Successfully liked tweet ${args!.tweet_id}` }) }] };
-      }
-      case "delete_tweet": {
-        const client = getAccountClient(args?.account as string | undefined);
-        await client.deleteTweet(args!.tweet_id as string);
-        return { content: [{ type: "text", text: JSON.stringify({ success: true, message: `Successfully deleted tweet ${args!.tweet_id}` }) }] };
-      }
-      case "list_accounts": {
-        return { content: [{ type: "text", text: JSON.stringify({ accounts: clients.map((c) => ({ name: c.getAccountName() })), default_account: clients[0]?.getAccountName() }) }] };
-      }
-      default:
-        return { content: [{ type: "text", text: JSON.stringify({ error: `Unknown tool: ${name}` }) }], isError: true };
-    }
-  } catch (error) {
-    return { content: [{ type: "text", text: JSON.stringify({ error: error instanceof Error ? error.message : String(error) }) }], isError: true };
-  }
 }
 
-// Start the server
+app.all("/mcp", async (req: Request, res: Response) => {
+  try {
+    const body = req.body;
+    if (!body || !body.method) {
+      res.json({ jsonrpc: "2.0", id: body?.id ?? null, error: { code: -32600, message: "Invalid request" } });
+      return;
+    }
+    let result: unknown;
+    switch (body.method) {
+      case "initialize":
+        result = {
+          protocolVersion: "2025-03-26",
+          capabilities: { tools: {} },
+          serverInfo: { name: "twitter-mcp-server", version: "1.0.0" },
+        };
+        break;
+      case "tools/list":
+        result = { tools };
+        break;
+      case "tools/call":
+        result = await handleToolCall(body.params);
+        break;
+      case "ping":
+        result = {};
+        break;
+      default:
+        res.json({ jsonrpc: "2.0", id: body.id, error: { code: -32601, message: "Method not found" } });
+        return;
+    }
+    res.json({ jsonrpc: "2.0", id: body.id, result });
+  } catch (e) {
+    console.error("[mcp]", e);
+    res.status(500).json({ jsonrpc: "2.0", id: null, error: { code: -32603, message: e instanceof Error ? e.message : String(e) } });
+  }
+});
+
 const PORT = config.port;
 const HOST = config.host;
 
 app.listen(PORT, HOST, () => {
-  console.log(`🚀 Twitter MCP Server running on ${HOST}:${PORT}`);
-  console.log(`📡 MCP endpoint: http://${HOST}:${PORT}/mcp`);
-  console.log(`❤️  Health check: http://${HOST}:${PORT}/health`);
-  console.log(
-    `👤 Configured accounts: ${clients.map((c) => c.getAccountName()).join(", ")}`
-  );
+  console.log(`[mcp] Twitter MCP Server listening on http://${HOST}:${PORT}/mcp (account=${client.getAccountName()}, oauth2=${oauth2 ? "on" : "off"})`);
 });
 
-// Graceful shutdown
 process.on("SIGTERM", () => {
-  console.log("Shutting down...");
+  console.log("[mcp] shutting down");
   process.exit(0);
 });

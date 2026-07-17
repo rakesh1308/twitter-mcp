@@ -23,5 +23,8 @@ Thumbs.db
 *.log
 npm-debug.log*
 
-# Test coverage
+# Coverage
 coverage/
+
+# Local agent worktrees
+.claude/
