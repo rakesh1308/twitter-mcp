@@ -30,7 +30,11 @@ def build_handlers(client: TwitterClient, oauth2: OAuth2Client | None) -> dict[s
     handlers: dict[str, Callable[..., Any]] = {}
 
     def _text(payload: Any) -> dict[str, Any]:
-        return {"content": [{"type": "text", "text": _json(payload)}]}
+        if isinstance(payload, str):
+            text = payload
+        else:
+            text = _json(payload)
+        return {"content": [{"type": "text", "text": text}], "_payload": payload}
 
     def _err(message: str) -> dict[str, Any]:
         return {"content": [{"type": "text", "text": json.dumps({"error": message})}], "isError": True}
@@ -129,22 +133,83 @@ def build_handlers(client: TwitterClient, oauth2: OAuth2Client | None) -> dict[s
     return handlers
 
 
+SUCCESS_OUTPUT: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "success": {"type": "boolean", "const": True},
+        "message": {"type": "string"},
+    },
+    "required": ["success"],
+    "additionalProperties": True,
+}
+
+TWEET_OUTPUT: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "id": {"type": "string"},
+        "text": {"type": "string"},
+        "created_at": {"type": "string"},
+    },
+    "required": ["id"],
+    "additionalProperties": True,
+}
+
+SEARCH_OUTPUT: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "count": {"type": "integer"},
+        "tweets": {"type": "array", "items": {"type": "object", "additionalProperties": True}},
+    },
+    "required": ["count"],
+    "additionalProperties": True,
+}
+
+USER_OUTPUT: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "id": {"type": "string"},
+        "username": {"type": "string"},
+        "name": {"type": "string"},
+    },
+    "required": ["id", "username"],
+    "additionalProperties": True,
+}
+
+USER_LIST_OUTPUT: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "count": {"type": "integer"},
+        "next_token": {"type": ["string", "null"]},
+        "users": {"type": "array", "items": {"type": "object", "additionalProperties": True}},
+    },
+    "required": ["count", "users"],
+    "additionalProperties": True,
+}
+
+ACCOUNT_OUTPUT: dict[str, Any] = {
+    "type": "object",
+    "properties": {"account": {"type": "string"}},
+    "required": ["account"],
+    "additionalProperties": True,
+}
+
+
 TOOL_SCHEMAS: list[dict[str, Any]] = [
-    {"name": "post_tweet", "description": "Post a new tweet. text: tweet text (max 280 chars).", "params": {"text": "string"}, "required": ["text"]},
-    {"name": "reply_to_tweet", "description": "Reply to a tweet. tweet_id, text.", "params": {"tweet_id": "string", "text": "string"}, "required": ["tweet_id", "text"]},
-    {"name": "get_tweet", "description": "Get tweet details. tweet_id.", "params": {"tweet_id": "string"}, "required": ["tweet_id"]},
-    {"name": "search_tweets", "description": "Search recent tweets. query, max_results (1-100, default 10).", "params": {"query": "string", "max_results": "int"}, "required": ["query"]},
-    {"name": "search_all_tweets", "description": "Search all tweets (elevated API). query, max_results (1-100, default 10).", "params": {"query": "string", "max_results": "int"}, "required": ["query"]},
-    {"name": "get_user", "description": "Get user info by username. username (no @).", "params": {"username": "string"}, "required": ["username"]},
-    {"name": "get_user_tweets", "description": "Get recent tweets from a user. username, max_results (1-100, default 10).", "params": {"username": "string", "max_results": "int"}, "required": ["username"]},
-    {"name": "retweet", "description": "Retweet a tweet. tweet_id, user_id (your numeric ID).", "params": {"tweet_id": "string", "user_id": "string"}, "required": ["tweet_id", "user_id"]},
-    {"name": "like_tweet", "description": "Like a tweet. tweet_id, user_id.", "params": {"tweet_id": "string", "user_id": "string"}, "required": ["tweet_id", "user_id"]},
-    {"name": "delete_tweet", "description": "Delete one of your tweets. tweet_id.", "params": {"tweet_id": "string"}, "required": ["tweet_id"]},
-    {"name": "list_accounts", "description": "Show configured account.", "params": {}, "required": []},
-    {"name": "follow_user", "description": "Follow a user (OAuth 2.0). user_id.", "params": {"user_id": "string"}, "required": ["user_id"], "oauth2": True},
-    {"name": "unfollow_user", "description": "Unfollow a user (OAuth 2.0). user_id.", "params": {"user_id": "string"}, "required": ["user_id"], "oauth2": True},
-    {"name": "get_following", "description": "List accounts you follow (OAuth 2.0). max_results, pagination_token.", "params": {"max_results": "int", "pagination_token": "string"}, "required": [], "oauth2": True},
-    {"name": "get_followers", "description": "List accounts following you (OAuth 2.0). max_results, pagination_token.", "params": {"max_results": "int", "pagination_token": "string"}, "required": [], "oauth2": True},
+    {"name": "post_tweet", "description": "Post a new tweet. text: tweet text (max 280 chars).", "params": {"text": "string"}, "required": ["text"], "output": TWEET_OUTPUT},
+    {"name": "reply_to_tweet", "description": "Reply to a tweet. tweet_id, text.", "params": {"tweet_id": "string", "text": "string"}, "required": ["tweet_id", "text"], "output": TWEET_OUTPUT},
+    {"name": "get_tweet", "description": "Get tweet details. tweet_id.", "params": {"tweet_id": "string"}, "required": ["tweet_id"], "output": TWEET_OUTPUT},
+    {"name": "search_tweets", "description": "Search recent tweets. query, max_results (1-100, default 10).", "params": {"query": "string", "max_results": "int"}, "required": ["query"], "output": SEARCH_OUTPUT},
+    {"name": "search_all_tweets", "description": "Search all tweets (elevated API). query, max_results (1-100, default 10).", "params": {"query": "string", "max_results": "int"}, "required": ["query"], "output": SEARCH_OUTPUT},
+    {"name": "get_user", "description": "Get user info by username. username (no @).", "params": {"username": "string"}, "required": ["username"], "output": USER_OUTPUT},
+    {"name": "get_user_tweets", "description": "Get recent tweets from a user. username, max_results (1-100, default 10).", "params": {"username": "string", "max_results": "int"}, "required": ["username"], "output": SEARCH_OUTPUT},
+    {"name": "retweet", "description": "Retweet a tweet. tweet_id, user_id (your numeric ID).", "params": {"tweet_id": "string", "user_id": "string"}, "required": ["tweet_id", "user_id"], "output": SUCCESS_OUTPUT},
+    {"name": "like_tweet", "description": "Like a tweet. tweet_id, user_id.", "params": {"tweet_id": "string", "user_id": "string"}, "required": ["tweet_id", "user_id"], "output": SUCCESS_OUTPUT},
+    {"name": "delete_tweet", "description": "Delete one of your tweets. tweet_id.", "params": {"tweet_id": "string"}, "required": ["tweet_id"], "output": SUCCESS_OUTPUT},
+    {"name": "list_accounts", "description": "Show configured account.", "params": {}, "required": [], "output": ACCOUNT_OUTPUT},
+    {"name": "follow_user", "description": "Follow a user (OAuth 2.0). user_id.", "params": {"user_id": "string"}, "required": ["user_id"], "oauth2": True, "output": SUCCESS_OUTPUT},
+    {"name": "unfollow_user", "description": "Unfollow a user (OAuth 2.0). user_id.", "params": {"user_id": "string"}, "required": ["user_id"], "oauth2": True, "output": SUCCESS_OUTPUT},
+    {"name": "get_following", "description": "List accounts you follow (OAuth 2.0). max_results, pagination_token.", "params": {"max_results": "int", "pagination_token": "string"}, "required": [], "oauth2": True, "output": USER_LIST_OUTPUT},
+    {"name": "get_followers", "description": "List accounts following you (OAuth 2.0). max_results, pagination_token.", "params": {"max_results": "int", "pagination_token": "string"}, "required": [], "oauth2": True, "output": USER_LIST_OUTPUT},
 ]
 
 
@@ -188,6 +253,7 @@ def main() -> None:
                         "properties": {k: {"type": "string" if v == "string" else "number"} for k, v in t["params"].items()},
                         **({"required": t["required"]} if t["required"] else {}),
                     },
+                    "outputSchema": t["output"],
                 }
                 for t in schemas
             ]
@@ -201,7 +267,11 @@ def main() -> None:
                 return JSONResponse({"jsonrpc": "2.0", "id": rid, "error": {"code": -32601, "message": f"Unknown tool: {name}"}})
             try:
                 result = handler(**args)
-                return JSONResponse({"jsonrpc": "2.0", "id": rid, "result": result})
+                structured = result.pop("_payload", None)
+                response: dict[str, Any] = {"jsonrpc": "2.0", "id": rid, "result": result}
+                if structured is not None:
+                    response["result"]["structuredContent"] = structured
+                return JSONResponse(response)
             except Exception as exc:
                 return JSONResponse({
                     "jsonrpc": "2.0",
