@@ -203,3 +203,20 @@ class OAuth2Client:
         if pagination_token:
             params["pagination_token"] = pagination_token
         return await self._request("GET", f"/users/{my_user_id}/followers", params=params)
+
+
+def _parse_expires(raw: str | None) -> int:
+    if not raw:
+        return int(time.time())
+    trimmed = raw.strip()
+    if trimmed.isdigit():
+        n = int(trimmed)
+        return n // 1000 if n > 1_000_000_000_000 else n
+    try:
+        from datetime import datetime, timezone
+        dt = datetime.fromisoformat(trimmed.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return int(dt.timestamp())
+    except ValueError:
+        return int(time.time())
