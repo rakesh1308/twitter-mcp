@@ -30,11 +30,11 @@ class OAuth2Tokens:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "OAuth2Tokens":
         return cls(
-            client_id=data["client_id"],
-            client_secret=data["client_secret"],
-            access_token=data["access_token"],
-            refresh_token=data["refresh_token"],
-            expires_at=int(data["expires_at"]),
+            client_id=data.get("client_id") or "",
+            client_secret=data.get("client_secret") or "",
+            access_token=data.get("access_token") or "",
+            refresh_token=data.get("refresh_token") or "",
+            expires_at=int(data.get("expires_at") or 0),
             scope=data.get("scope"),
         )
 
@@ -87,11 +87,17 @@ class OAuth2Client:
         try:
             if path.exists():
                 stored = OAuth2Tokens.from_dict(json.loads(path.read_text(encoding="utf-8")))
+                access_token = stored.access_token or self._tokens.access_token
+                refresh_token = stored.refresh_token or self._tokens.refresh_token
+                if not access_token or not refresh_token:
+                    print(f"[oauth2] token file {path} missing access/refresh token; ignoring", flush=True)
+                    self._persist()
+                    return
                 self._tokens = OAuth2Tokens(
-                    client_id=self._tokens.client_id,
-                    client_secret=self._tokens.client_secret,
-                    access_token=stored.access_token or self._tokens.access_token,
-                    refresh_token=stored.refresh_token or self._tokens.refresh_token,
+                    client_id=self._tokens.client_id or stored.client_id,
+                    client_secret=self._tokens.client_secret or stored.client_secret,
+                    access_token=access_token,
+                    refresh_token=refresh_token,
                     expires_at=stored.expires_at or self._tokens.expires_at,
                     scope=stored.scope or self._tokens.scope,
                 )
