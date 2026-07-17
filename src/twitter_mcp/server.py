@@ -91,32 +91,32 @@ def build_handlers(client: TwitterClient, oauth2: OAuth2Client | None) -> dict[s
     )
 
     if oauth2 is not None:
-        def follow_user(user_id: str) -> dict[str, Any]:
+        async def follow_user(user_id: str) -> dict[str, Any]:
             assert oauth2 is not None
             me = client.get_me()
-            asyncio.run(oauth2.follow_user(me["id"], user_id))
+            await oauth2.follow_user(me["id"], user_id)
             return _text({"success": True, "followed": user_id})
 
-        def unfollow_user(user_id: str) -> dict[str, Any]:
+        async def unfollow_user(user_id: str) -> dict[str, Any]:
             assert oauth2 is not None
             me = client.get_me()
-            asyncio.run(oauth2.unfollow_user(me["id"], user_id))
+            await oauth2.unfollow_user(me["id"], user_id)
             return _text({"success": True, "unfollowed": user_id})
 
-        def get_following(max_results: int = 100, pagination_token: str | None = None) -> dict[str, Any]:
+        async def get_following(max_results: int = 100, pagination_token: str | None = None) -> dict[str, Any]:
             assert oauth2 is not None
             me = client.get_me()
-            res = asyncio.run(oauth2.get_following(me["id"], max_results, pagination_token))
+            res = await oauth2.get_following(me["id"], max_results, pagination_token)
             return _text({
                 "count": len(res.get("data") or []),
                 "next_token": (res.get("meta") or {}).get("next_token"),
                 "users": res.get("data") or [],
             })
 
-        def get_followers(max_results: int = 100, pagination_token: str | None = None) -> dict[str, Any]:
+        async def get_followers(max_results: int = 100, pagination_token: str | None = None) -> dict[str, Any]:
             assert oauth2 is not None
             me = client.get_me()
-            res = asyncio.run(oauth2.get_followers(me["id"], max_results, pagination_token))
+            res = await oauth2.get_followers(me["id"], max_results, pagination_token)
             return _text({
                 "count": len(res.get("data") or []),
                 "next_token": (res.get("meta") or {}).get("next_token"),
@@ -267,6 +267,8 @@ def main() -> None:
                 return JSONResponse({"jsonrpc": "2.0", "id": rid, "error": {"code": -32601, "message": f"Unknown tool: {name}"}})
             try:
                 result = handler(**args)
+                if asyncio.iscoroutine(result):
+                    result = await result
                 structured = result.pop("_payload", None)
                 response: dict[str, Any] = {"jsonrpc": "2.0", "id": rid, "result": result}
                 if structured is not None:

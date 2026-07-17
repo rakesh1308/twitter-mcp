@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import time
@@ -50,6 +51,7 @@ class OAuth2Client:
         self._tokens = tokens
         self._opts = opts
         self._client = httpx.Client(base_url=API_BASE, timeout=30.0)
+        self._async_client = httpx.AsyncClient(base_url=API_BASE, timeout=30.0)
         self._refresh_lock = False
 
     @classmethod
@@ -79,6 +81,8 @@ class OAuth2Client:
 
     def close(self) -> None:
         self._client.close()
+        if not self._async_client.is_closed:
+            asyncio.run(self._async_client.aclose())
 
     # ---- persistence -----------------------------------------------------
 
@@ -149,8 +153,6 @@ class OAuth2Client:
 
     @property
     def _client_async(self) -> httpx.AsyncClient:
-        if not hasattr(self, "_async_client") or self._async_client.is_closed:
-            self._async_client = httpx.AsyncClient(base_url=API_BASE, timeout=30.0)
         return self._async_client
 
     async def _ensure_token(self) -> str:
