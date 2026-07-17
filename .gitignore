@@ -1,15 +1,10 @@
-# Dependencies
-node_modules/
-.venv/
-venv/
+# Python
 __pycache__/
 *.pyc
 *.pyo
 *.egg-info/
-
-# Build output
-dist/
-build/
+.venv/
+venv/
 
 # Environment files
 .env
@@ -28,10 +23,10 @@ Thumbs.db
 
 # Logs
 *.log
-npm-debug.log*
 
-# Coverage
-coverage/
+# Build
+build/
+dist/
 
 # Local agent worktrees
 .claude/
