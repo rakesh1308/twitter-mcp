@@ -4,18 +4,16 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
-import sys
 from typing import Any, Callable
 
 import httpx
 import uvicorn
 from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
-from .config import load_config
+from .config import Config, load_config
 from .oauth1 import TwitterClient
 from .oauth2 import OAuth2Client
 
@@ -217,21 +215,24 @@ def tool_schemas(include_oauth2: bool) -> list[dict[str, Any]]:
     return [t for t in TOOL_SCHEMAS if include_oauth2 or not t.get("oauth2")]
 
 
-def main() -> None:
-    cfg = load_config()
+def create_app(cfg: Config) -> Starlette:
     client = TwitterClient(cfg.account)
     oauth2 = OAuth2Client.from_env()
     handlers = build_handlers(client, oauth2)
     schemas = tool_schemas(oauth2 is not None)
-    host = cfg.host
-    port = cfg.port
 
-    async def mcp_endpoint(request: Request) -> JSONResponse:
+    async def mcp_endpoint(request: Request) -> Response:
+        if request.method != "POST":
+            return Response(status_code=405, headers={"Allow": "POST"})
         try:
             body = await request.json()
         except Exception:
             return JSONResponse({"jsonrpc": "2.0", "id": None, "error": {"code": -32600, "message": "Invalid request"}})
+        if not isinstance(body, dict):
+            return JSONResponse({"jsonrpc": "2.0", "id": None, "error": {"code": -32600, "message": "Invalid request"}})
         method = body.get("method")
+        if method == "notifications/initialized" and "id" not in body:
+            return Response(status_code=202)
         rid = body.get("id")
         if method == "initialize":
             return JSONResponse({
@@ -304,14 +305,18 @@ def main() -> None:
             "endpoints": {"health": "/health", "mcp": "/mcp"},
         })
 
-    app = Starlette(routes=[
+    return Starlette(routes=[
         Route("/", root, methods=["GET"]),
         Route("/health", health, methods=["GET"]),
         Route("/mcp", mcp_endpoint, methods=["POST", "GET", "DELETE"]),
     ])
 
-    print(f"[mcp] Twitter MCP Server listening on http://{host}:{port}/mcp (account={client.name}, oauth2={'on' if oauth2 else 'off'})", flush=True)
-    uvicorn.run(app, host=host, port=port, log_level="warning")
+
+def main() -> None:
+    cfg = load_config()
+    app = create_app(cfg)
+    print(f"[mcp] Twitter MCP Server listening on http://{cfg.host}:{cfg.port}/mcp", flush=True)
+    uvicorn.run(app, host=cfg.host, port=cfg.port, log_level="warning")
 
 
 if __name__ == "__main__":
