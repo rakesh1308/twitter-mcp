@@ -74,6 +74,25 @@ Tokens auto-refresh on expiry and persist to `TWITTER_OAUTH2_TOKEN_FILE`. On Zea
 5. Add a **Persistent Volume** mounted at `/data`.
 6. Deploy. Public URL is `https://<project>.zeabur.app`.
 
+## Deploy to Vercel
+
+Import the repository from Git and use the FastAPI framework preset with the
+repository root. Vercel loads the ASGI app from `app.py`. No build command,
+output directory, or `HOST` and `PORT` settings are needed.
+
+In the Vercel project, add the four OAuth 1.0a variables listed above and
+`MCP_AUTH_TOKEN` as Production secrets. Generate a separate random MCP token
+with `openssl rand -hex 32`. Redeploy if the variables were added after the
+initial deployment.
+
+Connect an MCP client over Streamable HTTP at
+`https://<project>.vercel.app/mcp` with the header
+`Authorization: Bearer <MCP_AUTH_TOKEN>`. Check `GET /health` for runtime
+configuration status. Unauthenticated requests to `/mcp` are rejected.
+
+Leave the optional OAuth 2.0 variables unset on Vercel. Their current token
+refresh implementation needs durable storage for the rotated refresh token.
+
 ## Connect from an MCP client
 
 Streamable HTTP at `/mcp`:
