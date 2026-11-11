@@ -51,10 +51,23 @@ class TwitterClient:
         detail = response.reason_phrase
         try:
             data = response.json()
+        except ValueError:
+            detail = response.text or detail
+        else:
             if isinstance(data, dict):
                 detail = data.get("detail") or data.get("error") or detail
-        except Exception:
-            detail = response.text or detail
+                errors = data.get("errors")
+                if isinstance(errors, list):
+                    messages = [
+                        error["message"]
+                        for error in errors
+                        if isinstance(error, dict)
+                        and isinstance(error.get("message"), str)
+                        and error["message"]
+                    ]
+                    messages = list(dict.fromkeys(message for message in messages if message != detail))
+                    if messages:
+                        detail = f"{detail} ({' | '.join(messages)})"
         raise RuntimeError(f"Twitter API error: {response.status_code} - {detail}")
 
     # ---- tweet lifecycle -------------------------------------------------
