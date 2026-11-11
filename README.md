@@ -80,15 +80,18 @@ Import the repository from Git and use the FastAPI framework preset with the
 repository root. Vercel loads the ASGI app from `app.py`. No build command,
 output directory, or `HOST` and `PORT` settings are needed.
 
-In the Vercel project, add the four OAuth 1.0a variables listed above and
-`MCP_AUTH_TOKEN` as Production secrets. Generate a separate random MCP token
-with `openssl rand -hex 32`. Redeploy if the variables were added after the
-initial deployment.
+In the Vercel project, enable Vercel Authentication for **All Deployments**
+under Deployment Protection before adding credentials. This includes the
+production domain. The app relies on Vercel to authenticate requests.
+
+Add the four OAuth 1.0a variables listed above as Production secrets. Redeploy
+if the variables were added after the initial deployment.
 
 Connect an MCP client over Streamable HTTP at
-`https://<project>.vercel.app/mcp` with the header
-`Authorization: Bearer <MCP_AUTH_TOKEN>`. Check `GET /health` for runtime
-configuration status. Unauthenticated requests to `/mcp` are rejected.
+`https://<project>.vercel.app/mcp`. For an unattended client that can send
+custom headers, use Vercel's Protection Bypass for Automation and pass its
+secret as the `x-vercel-protection-bypass` header. Check `GET /health` with
+Vercel access for runtime configuration status.
 
 Leave the optional OAuth 2.0 variables unset on Vercel. Their current token
 refresh implementation needs durable storage for the rotated refresh token.

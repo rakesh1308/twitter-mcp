@@ -16,4 +16,4 @@ except RuntimeError:
     async def unconfigured() -> JSONResponse:
         return JSONResponse({"status": "unconfigured"}, status_code=503)
 else:
-    app.mount("/", create_app(config, require_mcp_token=True))
+    app.mount("/", create_app(config))

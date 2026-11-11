@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
-from hmac import compare_digest
 from typing import Any, Callable
 
 import httpx
@@ -217,24 +215,13 @@ def tool_schemas(include_oauth2: bool) -> list[dict[str, Any]]:
     return [t for t in TOOL_SCHEMAS if include_oauth2 or not t.get("oauth2")]
 
 
-def create_app(cfg: Config, *, require_mcp_token: bool = False) -> Starlette:
+def create_app(cfg: Config) -> Starlette:
     client = TwitterClient(cfg.account)
     oauth2 = OAuth2Client.from_env()
     handlers = build_handlers(client, oauth2)
     schemas = tool_schemas(oauth2 is not None)
-    mcp_token = os.getenv("MCP_AUTH_TOKEN")
 
     async def mcp_endpoint(request: Request) -> Response:
-        if require_mcp_token and not mcp_token:
-            return JSONResponse({"error": "MCP authentication is not configured"}, status_code=503)
-        if mcp_token:
-            scheme, _, token = request.headers.get("authorization", "").partition(" ")
-            if scheme.lower() != "bearer" or not compare_digest(token.encode(), mcp_token.encode()):
-                return JSONResponse(
-                    {"error": "Unauthorized"},
-                    status_code=401,
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
         if request.method != "POST":
             return Response(status_code=405, headers={"Allow": "POST"})
         try:
@@ -302,8 +289,6 @@ def create_app(cfg: Config, *, require_mcp_token: bool = False) -> Starlette:
         return JSONResponse({"jsonrpc": "2.0", "id": rid, "error": {"code": -32601, "message": "Method not found"}})
 
     async def health(_request: Request) -> JSONResponse:
-        if require_mcp_token and not mcp_token:
-            return JSONResponse({"status": "unconfigured"}, status_code=503)
         return JSONResponse({
             "status": "healthy",
             "account": client.name,
