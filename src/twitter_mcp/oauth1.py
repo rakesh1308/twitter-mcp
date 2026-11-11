@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Generator
 from typing import Any
 
 import httpx
@@ -13,12 +14,26 @@ API_BASE = "https://api.twitter.com/2"
 DEFAULT_PAGE_SIZE = 10
 
 
+class JsonPreservingOAuth1Auth(OAuth1Auth):
+    def auth_flow(self, request: httpx.Request) -> Generator[httpx.Request, httpx.Response, None]:
+        content_type = request.headers.get("Content-Type", "").partition(";")[0].strip().lower()
+        if content_type != "application/json":
+            yield from super().auth_flow(request)
+            return
+
+        # OAuth 1.0a excludes JSON from the signature parameters. Keep the
+        # original HTTPX request so Authlib cannot replace its body with b"".
+        _, headers, _ = self.prepare(request.method, str(request.url), request.headers.copy(), b"")
+        request.headers["Authorization"] = headers["Authorization"]
+        yield request
+
+
 class TwitterClient:
     def __init__(self, account: OAuth1Account) -> None:
         self.account = account
         self._client = httpx.Client(
             base_url=API_BASE,
-            auth=OAuth1Auth(
+            auth=JsonPreservingOAuth1Auth(
                 client_id=account.api_key,
                 client_secret=account.api_secret,
                 token=account.access_token,
