@@ -220,20 +220,20 @@ python -m twitter_mcp
 
 ```
 twitter-mcp/
-├── api/index.py            # Vercel serverless entrypoint
-├── src/twitter_mcp/
-│   ├── api.py              # tool catalog (posts, users, likes, lists, media, trends, ...)
-│   ├── api_extended.py     # tool catalog (chat, broadcasts, calls, bots, compliance, ...)
-│   ├── server.py           # ASGI app, MCP JSON-RPC, tool dispatch, coverage report
-│   ├── oauth1.py           # async OAuth 1.0a client
-│   ├── oauth2.py           # async OAuth 2.0 client with token refresh
-│   ├── config.py           # environment -> typed config
-│   ├── errors.py           # shared X API error type
-│   └── x_api_operations.json  # snapshot of the official OpenAPI operations
-├── tests/                  # contract + coverage tests
-├── vercel.json
-├── requirements.txt
-└── Dockerfile
+â”œâ”€â”€ api/index.py            # Vercel serverless entrypoint
+â”œâ”€â”€ src/twitter_mcp/
+â”‚   â”œâ”€â”€ api.py              # tool catalog (posts, users, likes, lists, media, trends, ...)
+â”‚   â”œâ”€â”€ api_extended.py     # tool catalog (chat, broadcasts, calls, bots, compliance, ...)
+â”‚   â”œâ”€â”€ server.py           # ASGI app, MCP JSON-RPC, tool dispatch, coverage report
+â”‚   â”œâ”€â”€ oauth1.py           # async OAuth 1.0a client
+â”‚   â”œâ”€â”€ oauth2.py           # async OAuth 2.0 client with token refresh
+â”‚   â”œâ”€â”€ config.py           # environment -> typed config
+â”‚   â”œâ”€â”€ errors.py           # shared X API error type
+â”‚   â””â”€â”€ x_api_operations.json  # snapshot of the official OpenAPI operations
+â”œâ”€â”€ tests/                  # contract + coverage tests
+â”œâ”€â”€ vercel.json
+â”œâ”€â”€ requirements.txt
+â””â”€â”€ Dockerfile
 ```
 
 ## License
