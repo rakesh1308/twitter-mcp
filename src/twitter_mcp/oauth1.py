@@ -13,7 +13,7 @@ import httpx
 from authlib.integrations.httpx_client import OAuth1Auth
 
 from .config import OAuth1Account
-from .errors import XApiError
+from .errors import XApiError, _describe_error
 
 API_BASE = "https://api.x.com"
 DEFAULT_PAGE_SIZE = 10
@@ -84,7 +84,7 @@ class TwitterClient:
         try:
             payload = response.json()
             if isinstance(payload, dict):
-                detail = payload.get("detail") or payload.get("error") or payload.get("title") or detail
+                detail = _describe_error(payload) or detail
         except Exception:
             detail = response.text or detail
         return XApiError(response.status_code, str(detail), method, path)

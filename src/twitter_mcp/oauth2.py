@@ -12,7 +12,7 @@ from typing import Any
 
 import httpx
 
-from .errors import XApiError
+from .errors import XApiError, _describe_error
 
 TOKEN_URL = "https://api.x.com/2/oauth2/token"
 API_BASE = "https://api.x.com"
@@ -208,7 +208,7 @@ class OAuth2Client:
         try:
             payload = response.json()
             if isinstance(payload, dict):
-                detail = payload.get("detail") or payload.get("error") or payload.get("title") or detail
+                detail = _describe_error(payload) or detail
         except Exception:
             detail = response.text or detail
         return XApiError(response.status_code, str(detail), method, path)
