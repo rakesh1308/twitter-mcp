@@ -126,6 +126,9 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=8765)
     args = parser.parse_args()
 
+    # X expects a space separated scope list; accept commas or newlines too.
+    args.scope = " ".join(args.scope.replace(",", " ").split())
+
     if not args.client_id or not args.client_secret:
         raise SystemExit("--client-id and --client-secret are required (or set TWITTER_OAUTH2_CLIENT_ID/SECRET)")
 
@@ -145,7 +148,8 @@ def main() -> None:
     url = f"https://x.com/i/oauth2/authorize?{query}"
     print("Open this URL, sign in and approve the app:\n")
     print(url)
-    print("\nWaiting for the redirect on http://localhost:%d/callback ..." % args.port)
+    print(f"\nRequested scopes ({len(args.scope.split())}): {args.scope}\n")
+    print("Waiting for the redirect on http://localhost:%d/callback ..." % args.port)
 
     server = start_redirect_handler(args.port)
     try:
