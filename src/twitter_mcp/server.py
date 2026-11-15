@@ -311,6 +311,9 @@ class ToolRunner:
                 probes["oauth2_get_users_me"] = {"ok": True, "data": me2.get("data")}
             except Exception as exc:  # noqa: BLE001
                 probes["oauth2_get_users_me"] = {"ok": False, "error": str(exc)}
+                self._note_oauth2_unusable(OAuth2Unavailable(str(exc)))
+        state["oauth2"]["usable"] = bool(self.oauth2 is not None and self.oauth2.available)
+        state["oauth2"]["reason"] = self.oauth2.disabled_reason if self.oauth2 else "not configured"
         state["probes"] = probes
         state["posts"] = {
             "endpoint": "POST /2/tweets",

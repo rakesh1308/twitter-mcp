@@ -261,3 +261,26 @@ def test_unsupported_authentication_errors_mention_oauth2() -> None:
 
     error = XApiError(403, "Unsupported Authentication; OAuth 1.0a User Context is forbidden", "GET", "/2/account")
     assert "OAuth 2.0" in str(error)
+
+def test_diagnostics_latches_a_broken_oauth2_client() -> None:
+    from starlette.testclient import TestClient
+
+    class BrokenOAuth2:
+        disabled_reason = None
+        _tokens = type("T", (), {"scope": "tweet.read"})()
+
+        @property
+        def available(self) -> bool:
+            return self.disabled_reason is None
+
+        async def request(self, *args: object, **kwargs: object) -> dict:
+            from twitter_mcp.errors import OAuth2Unavailable
+
+            raise OAuth2Unavailable("refresh token rejected")
+
+    app = create_app()
+    app.state.runner.oauth2 = BrokenOAuth2()
+    with TestClient(app) as client:
+        payload = client.get("/diagnostics").json()
+    assert payload["oauth2"]["usable"] is False
+    assert "refresh token rejected" in payload["oauth2"]["reason"]
