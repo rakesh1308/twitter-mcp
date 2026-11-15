@@ -398,6 +398,26 @@ def create_app(client: TwitterClient | None = None, oauth2: OAuth2Client | None 
 
     async def endpoint(request: Request) -> Response:
         route = _route_of(request.url.path)
+        is_post = request.method == "POST"
+
+        if is_post:
+            # Any POST that carries a JSON-RPC envelope is treated as MCP so the
+            # server works behind rewrites that collapse the path (Vercel).
+            try:
+                probe = await request.json()
+            except Exception:
+                probe = None
+            if isinstance(probe, dict) and "method" in probe:
+                route = "mcp"
+
+        if not is_post:
+            query = request.query_params
+            if "health" in query:
+                route = "health"
+            elif "manifest" in query:
+                route = "manifest"
+            elif "coverage" in query:
+                route = "coverage"
 
         if route == "health":
             return JSONResponse(
