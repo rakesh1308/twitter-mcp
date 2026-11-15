@@ -220,3 +220,24 @@ def test_post_errors_carry_actionable_hints() -> None:
     assert "Read and write permissions" in str(error)
     assert "credit balance" in str(error)
     assert "POST /2/tweets" in str(error)
+
+def test_unknown_oauth2_expiry_uses_the_access_token_first() -> None:
+    """A bootstrap token must be used as it is; refresh only happens on a 401."""
+    import time as _time
+
+    from twitter_mcp.oauth2 import OAuth2Client, OAuth2Options, OAuth2Tokens, _parse_expires
+
+    assert _parse_expires(None) == 0
+    assert _parse_expires("not-a-date") == 0
+
+    unknown = OAuth2Tokens(client_id="c", client_secret="s", access_token="a", refresh_token="r", expires_at=0)
+    assert OAuth2Client(unknown, OAuth2Options())._is_expired() is False
+
+    expired = OAuth2Tokens(
+        client_id="c",
+        client_secret="s",
+        access_token="a",
+        refresh_token="r",
+        expires_at=int(_time.time()) - 10,
+    )
+    assert OAuth2Client(expired, OAuth2Options())._is_expired() is True

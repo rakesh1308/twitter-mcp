@@ -134,11 +134,16 @@ class OAuth2Client:
     # ---- refresh ---------------------------------------------------------
 
     def _is_expired(self) -> bool:
+        # expires_at == 0 means "expiry unknown": try the access token as it is
+        # and only refresh when X answers 401. This keeps a working bootstrap
+        # token usable even when the refresh token has been revoked.
+        if not self._tokens.expires_at:
+            return False
         return (self._tokens.expires_at * 1000) - time.time() * 1000 < self._opts.refresh_skew_seconds * 1000
 
-    async def _refresh(self) -> None:
+    async def _refresh(self, force: bool = False) -> None:
         async with self._refresh_lock:
-            if not self._is_expired():
+            if not force and not self._is_expired():
                 return
             auth = httpx.BasicAuth(self._tokens.client_id, self._tokens.client_secret)
             response = await self._client.post(
@@ -194,8 +199,10 @@ class OAuth2Client:
             headers={"Authorization": f"Bearer {token}"},
         )
         if response.status_code == 401:
-            self._tokens.expires_at = 0
-            await self._refresh()
+            try:
+                await self._refresh(force=True)
+            except OAuth2Unavailable as exc:
+                raise exc
             response = await self._client.request(
                 method,
                 path,
@@ -266,7 +273,9 @@ class OAuth2Client:
 
 def _parse_expires(raw: str | None) -> int:
     if not raw:
-        return int(time.time())
+        # 0 means "expiry unknown": the access token is tried first and a
+        # refresh only happens when X answers 401.
+        return 0
     trimmed = raw.strip()
     if trimmed.isdigit():
         n = int(trimmed)
@@ -279,4 +288,4 @@ def _parse_expires(raw: str | None) -> int:
             dt = dt.replace(tzinfo=timezone.utc)
         return int(dt.timestamp())
     except ValueError:
-        return int(time.time())
+        return 0
