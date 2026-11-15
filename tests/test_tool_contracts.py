@@ -241,3 +241,23 @@ def test_unknown_oauth2_expiry_uses_the_access_token_first() -> None:
         expires_at=int(_time.time()) - 10,
     )
     assert OAuth2Client(expired, OAuth2Options())._is_expired() is True
+
+def test_diagnostics_endpoint_reports_the_transport_state() -> None:
+    from starlette.testclient import TestClient
+
+    app = create_app()
+    with TestClient(app) as client:
+        response = client.get("/diagnostics")
+        assert response.status_code == 200
+        payload = response.json()
+        assert "oauth1" in payload and "oauth2" in payload
+        assert payload["oauth1"]["configured"] in (True, False)
+        assert "probes" in payload
+        assert payload["posts"]["endpoint"] == "POST /2/tweets"
+
+
+def test_unsupported_authentication_errors_mention_oauth2() -> None:
+    from twitter_mcp.errors import XApiError
+
+    error = XApiError(403, "Unsupported Authentication; OAuth 1.0a User Context is forbidden", "GET", "/2/account")
+    assert "OAuth 2.0" in str(error)

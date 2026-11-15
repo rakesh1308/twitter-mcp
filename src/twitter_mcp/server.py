@@ -221,6 +221,7 @@ class ToolRunner:
     def __init__(self, client: TwitterClient, oauth2: OAuth2Client | None) -> None:
         self.client = client
         self.oauth2 = oauth2
+        self.last_oauth2_error: str | None = None
 
     # -- transport selection ---------------------------------------------
 
@@ -262,6 +263,7 @@ class ToolRunner:
                 return await self.oauth2.request(method, path, **kwargs)
             except OAuth2Unavailable as exc:
                 failures.append(f"{transport}: {exc}")
+                self._note_oauth2_unusable(exc)
                 continue
             except XApiError as exc:
                 last_error = exc
@@ -275,6 +277,47 @@ class ToolRunner:
                 last_error.detail = f"{last_error.detail} | attempts: {', '.join(failures)}"
             raise last_error
         raise RuntimeError("; ".join(failures) or "no transport available")
+
+    def _note_oauth2_unusable(self, exc: OAuth2Unavailable) -> None:
+        """Remember that OAuth 2.0 failed so diagnostics can report it."""
+        if self.oauth2 is not None and self.oauth2.available:
+            self.oauth2.disabled_reason = str(exc)
+        self.last_oauth2_error = str(exc)
+
+    async def diagnostics(self) -> dict[str, Any]:
+        """Runtime proof of the credential and transport state."""
+        state: dict[str, Any] = {
+            "oauth1": {
+                "configured": bool(self.client.account.api_key),
+                "account": self.client.name,
+            },
+            "oauth2": {
+                "configured": self.oauth2 is not None,
+                "usable": bool(self.oauth2 is not None and self.oauth2.available),
+                "reason": self.oauth2.disabled_reason if self.oauth2 else "not configured",
+                "scope": self.oauth2._tokens.scope if self.oauth2 else None,
+            },
+            "last_oauth2_error": self.last_oauth2_error,
+        }
+        probes: dict[str, Any] = {}
+        try:
+            me = await self.client.request("GET", "/2/users/me", params={"user.fields": "id,username,name"})
+            probes["oauth1_get_users_me"] = {"ok": True, "data": me.get("data")}
+        except Exception as exc:  # noqa: BLE001
+            probes["oauth1_get_users_me"] = {"ok": False, "error": str(exc)}
+        if self.oauth2 is not None:
+            try:
+                me2 = await self.oauth2.request("GET", "/2/users/me", params={"user.fields": "id,username,name"})
+                probes["oauth2_get_users_me"] = {"ok": True, "data": me2.get("data")}
+            except Exception as exc:  # noqa: BLE001
+                probes["oauth2_get_users_me"] = {"ok": False, "error": str(exc)}
+        state["probes"] = probes
+        state["posts"] = {
+            "endpoint": "POST /2/tweets",
+            "note": "publishing needs Read and write permissions, an active credit balance and a token with "
+            "tweet.write; the server cannot verify the developer portal settings",
+        }
+        return state
 
     # -- parameter preparation -------------------------------------------
 
@@ -425,6 +468,8 @@ def create_app(client: TwitterClient | None = None, oauth2: OAuth2Client | None 
             return "mcp"
         if path.endswith("/health"):
             return "health"
+        if path.endswith("/diagnostics"):
+            return "diagnostics"
         if path.endswith("/tools-manifest.json"):
             return "manifest"
         if path.endswith("/api-coverage"):
@@ -468,6 +513,9 @@ def create_app(client: TwitterClient | None = None, oauth2: OAuth2Client | None 
         if route == "manifest":
             return JSONResponse({"server": SERVER_NAME, "version": SERVER_VERSION, "tools": schemas})
 
+        if route == "diagnostics":
+            return JSONResponse(await runner.diagnostics())
+
         if route == "coverage":
             return JSONResponse(coverage_report())
 
@@ -480,7 +528,13 @@ def create_app(client: TwitterClient | None = None, oauth2: OAuth2Client | None 
                     "account": client.name,
                     "oauth2": "configured" if oauth2 is not None else "disabled",
                     "tools": len(TOOLS),
-                    "endpoints": {"health": "/health", "mcp": "/mcp", "manifest": "/tools-manifest.json", "coverage": "/api-coverage"},
+                    "endpoints": {
+                        "health": "/health",
+                        "mcp": "/mcp",
+                        "manifest": "/tools-manifest.json",
+                        "coverage": "/api-coverage",
+                        "diagnostics": "/diagnostics",
+                    },
                 }
             )
 

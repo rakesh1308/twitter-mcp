@@ -29,7 +29,7 @@ class XApiError(RuntimeError):
 
     def __init__(self, status_code: int, detail: str, method: str = "", path: str = "") -> None:
         location = f" [{method} {path}]" if method and path else ""
-        hint = hint_for(status_code, method, path)
+        hint = hint_for(status_code, method, path, detail)
         message = f"X API error {status_code}{location} - {detail}"
         if hint:
             message = f"{message}. {hint}"
@@ -69,8 +69,13 @@ _HINTS: list[tuple[str, str, str]] = [
 ]
 
 
-def hint_for(status_code: int, method: str, path: str) -> str:
+def hint_for(status_code: int, method: str, path: str, detail: str = "") -> str:
     """Actionable guidance for the X API failures that are easy to misread."""
+    if "unsupported authentication" in detail.lower():
+        return (
+            "This endpoint only accepts OAuth 2.0. If OAuth 2.0 is configured but unusable, re-authorize with "
+            "scripts/oauth2_bootstrap.py and update TWITTER_OAUTH2_ACCESS_TOKEN and TWITTER_OAUTH2_REFRESH_TOKEN"
+        )
     for hint_method, hint_path, hint_text in _HINTS:
         if method.upper() == hint_method and path.startswith(hint_path):
             if status_code in (400, 403):
