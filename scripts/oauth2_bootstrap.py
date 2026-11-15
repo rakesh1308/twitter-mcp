@@ -80,6 +80,43 @@ def exchange(client_id: str, client_secret: str, code: str, verifier: str, redir
         raise SystemExit(1)
 
 
+def app_only_token(client_id: str, client_secret: str) -> str:
+    payload = urllib.parse.urlencode(
+        {
+            "grant_type": "client_credentials",
+            "client_id": client_id,
+            "client_secret": client_secret,
+        }
+    ).encode()
+    request = urllib.request.Request(
+        TOKEN_URL,
+        data=payload,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    with urllib.request.urlopen(request, timeout=60) as response:
+        return json.loads(response.read()).get("access_token", "")
+
+
+def check_credits(client_id: str, client_secret: str) -> None:
+    """Report the pay-per-use credit balance - posting needs credits on X."""
+    try:
+        token = app_only_token(client_id, client_secret)
+    except Exception as exc:  # noqa: BLE001
+        print(f"Could not mint an app-only token: {exc}")
+        return
+    request = urllib.request.Request(
+        "https://api.x.com/2/usage/credits",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            print("Credit balance:", response.read().decode(errors="replace"))
+    except urllib.error.HTTPError as err:
+        print(f"Credit check failed: {err.code} {err.read().decode(errors='replace')[:300]}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"Credit check failed: {exc}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Bootstrap X OAuth 2.0 tokens")
     parser.add_argument("--client-id", default=os.getenv("TWITTER_OAUTH2_CLIENT_ID", ""))
@@ -136,6 +173,8 @@ def main() -> None:
     print(f"TWITTER_OAUTH2_REFRESH_TOKEN={refresh_token}")
     print(f"TWITTER_OAUTH2_SCOPE={args.scope}")
     print(f"\nGranted scopes: {tokens.get('scope', args.scope)}")
+    print("\nChecking the pay-per-use credit balance (posting needs credits):")
+    check_credits(args.client_id, args.client_secret)
 
 
 if __name__ == "__main__":
