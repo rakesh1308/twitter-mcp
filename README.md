@@ -107,7 +107,11 @@ falls back to the other on a 401/403.
 
 ## Deploy to Vercel
 
-The repository contains a ready Vercel Python function (`api/index.py` + `vercel.json` + `requirements.txt`).
+The `twitter-mcp` Vercel project is already connected to `rakesh1308/twitter-mcp` with `main` as the production
+branch, so **every push to `main` is built and deployed automatically** - no CLI step is needed. The repository
+contains the Vercel Python function (`api/index.py` + `vercel.json` + `requirements.txt`) that the build uses.
+
+To deploy by hand (for example after changing environment variables), use the CLI:
 
 ```bash
 npm i -g vercel
