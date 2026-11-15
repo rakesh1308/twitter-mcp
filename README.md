@@ -130,6 +130,35 @@ The MCP endpoint is then available at `https://<deployment>.vercel.app/mcp`.
 > Serverless note: requests are stateless, so set `TWITTER_OAUTH2_TOKEN_FILE` to a writable path (for example
 > `/tmp/oauth2.json`) on Vercel - the token is refreshed from the refresh token on every cold start.
 
+### Live deployment
+
+| What | URL |
+|------|-----|
+| MCP endpoint | `https://twitter-mcp-rakesh1308s-projects.vercel.app/mcp` |
+| Health | `https://twitter-mcp-rakesh1308s-projects.vercel.app/health` |
+| Coverage report | `https://twitter-mcp-rakesh1308s-projects.vercel.app/api-coverage` |
+| Tool manifest | `https://twitter-mcp-rakesh1308s-projects.vercel.app/tools-manifest.json` |
+| Vercel project | `twitter-mcp` (aliases: `twitter-mcp-delta.vercel.app`) |
+
+The deployment already carries the OAuth 1.0a credentials (`TWITTER_API_KEY`, `TWITTER_API_SECRET`,
+`TWITTER_ACCESS_TOKEN`, `TWITTER_ACCESS_TOKEN_SECRET`), so posts, searches, users, lists, bookmarks, likes,
+reposts, follows and the generic `x_api_request` escape hatch work out of the box.
+
+The OAuth 2.0 variables are not set yet. Endpoints that X only serves to OAuth 2.0 clients (trends, media
+upload, direct messages, Chat and Spaces) answer with a clear error until the `TWITTER_OAUTH2_*` variables are
+added in the Vercel dashboard; add them and redeploy to unlock those families:
+
+```
+vercel env add TWITTER_OAUTH2_CLIENT_ID production
+vercel env add TWITTER_OAUTH2_CLIENT_SECRET production
+vercel env add TWITTER_OAUTH2_ACCESS_TOKEN production
+vercel env add TWITTER_OAUTH2_REFRESH_TOKEN production
+vercel env add TWITTER_OAUTH2_SCOPE production
+```
+
+> Vercel Authentication (SSO protection) is disabled for production so that MCP clients can reach the
+> endpoint; preview deployments stay protected.
+
 ## Deploy with Docker / Zeabur
 
 ```bash
