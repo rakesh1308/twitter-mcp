@@ -25,7 +25,7 @@ from starlette.routing import Route
 
 from .api import TOOLS, TOOL_INDEX, Tool
 from .config import OAuth1Account, load_config
-from .errors import XApiError
+from .errors import OAuth2Unavailable, XApiError
 from .oauth1 import TwitterClient
 from .oauth2 import OAuth2Client
 
@@ -225,30 +225,56 @@ class ToolRunner:
     # -- transport selection ---------------------------------------------
 
     def _transports(self, tool: Tool) -> list[str]:
+        oauth2_present = self.oauth2 is not None
+        oauth2_usable = oauth2_present and self.oauth2 is not None and self.oauth2.available
+
         if tool.auth == "oauth2":
-            if self.oauth2 is None:
+            if not oauth2_present:
                 raise RuntimeError(
                     f"Tool '{tool.name}' needs OAuth 2.0 (scope: {', '.join(tool.scopes) or 'oauth2'}). "
                     "Set the TWITTER_OAUTH2_* environment variables."
                 )
+            if not oauth2_usable:
+                reason = self.oauth2.disabled_reason if self.oauth2 else "unavailable"
+                raise RuntimeError(
+                    f"OAuth 2.0 is configured but unusable: {reason}. "
+                    "Re-authorize with scripts/oauth2_bootstrap.py and update TWITTER_OAUTH2_ACCESS_TOKEN and "
+                    "TWITTER_OAUTH2_REFRESH_TOKEN."
+                )
             return ["oauth2"]
         if tool.auth == "auto":
-            return ["oauth2", "oauth1"] if self.oauth2 is not None else ["oauth1"]
-        return ["oauth1", "oauth2"] if self.oauth2 is not None else ["oauth1"]
+            return ["oauth2", "oauth1"] if oauth2_usable else ["oauth1"]
+
+        # Reads work on OAuth 1.0a, but X rejects writes on that transport for
+        # projects that use OAuth 2.0, so writes try OAuth 2.0 first.
+        if tool.method.upper() in ("POST", "PUT", "PATCH", "DELETE"):
+            return ["oauth2", "oauth1"] if oauth2_usable else ["oauth1"]
+        return ["oauth1", "oauth2"] if oauth2_usable else ["oauth1"]
 
     async def _dispatch(self, transports: list[str], method: str, path: str, **kwargs: Any) -> Any:
-        last_error: Exception | None = None
+        failures: list[str] = []
+        last_error: XApiError | None = None
         for index, transport in enumerate(transports):
             try:
                 if transport == "oauth1":
                     return await self.client.request(method, path, **kwargs)
                 assert self.oauth2 is not None
                 return await self.oauth2.request(method, path, **kwargs)
+            except OAuth2Unavailable as exc:
+                failures.append(f"{transport}: {exc}")
+                continue
             except XApiError as exc:
                 last_error = exc
-                if not exc.auth_error or index == len(transports) - 1:
+                failures.append(f"{transport}: {exc}")
+                if index == len(transports) - 1:
+                    break
+                if exc.status_code not in (400, 401, 403):
                     raise
-        raise last_error or RuntimeError("no transport available")
+        if last_error is not None:
+            if len(failures) > 1:
+                last_error.detail = f"{last_error.detail} | attempts: {', '.join(failures)}"
+            raise last_error
+        raise RuntimeError("; ".join(failures) or "no transport available")
 
     # -- parameter preparation -------------------------------------------
 
@@ -332,14 +358,17 @@ class ToolRunner:
             raise ValueError("body must be an object")
 
         choice = str(args.get("auth") or "auto")
+        oauth2_usable = self.oauth2 is not None and self.oauth2.available
         if choice == "oauth2":
             if self.oauth2 is None:
                 raise RuntimeError("OAuth 2.0 is not configured on this server")
+            if not oauth2_usable:
+                raise RuntimeError(f"OAuth 2.0 is configured but unusable: {self.oauth2.disabled_reason}")
             transports = ["oauth2"]
         elif choice == "oauth1":
             transports = ["oauth1"]
         else:
-            transports = ["oauth2", "oauth1"] if self.oauth2 is not None else ["oauth1"]
+            transports = ["oauth2", "oauth1"] if oauth2_usable else ["oauth1"]
         return await self._dispatch(transports, method, path, params=query, json_body=body)
 
     # -- entry point ------------------------------------------------------

@@ -12,7 +12,7 @@ from typing import Any
 
 import httpx
 
-from .errors import XApiError, _describe_error
+from .errors import OAuth2Unavailable, XApiError, _describe_error
 
 TOKEN_URL = "https://api.x.com/2/oauth2/token"
 API_BASE = "https://api.x.com"
@@ -54,6 +54,12 @@ class OAuth2Client:
         self._opts = opts
         self._client = httpx.AsyncClient(base_url=API_BASE, timeout=30.0)
         self._refresh_lock = asyncio.Lock()
+        self.disabled_reason: str | None = None
+
+    @property
+    def available(self) -> bool:
+        """False once X has rejected the stored refresh token."""
+        return self.disabled_reason is None
 
     @classmethod
     def from_env(cls) -> "OAuth2Client | None":
@@ -141,7 +147,15 @@ class OAuth2Client:
                 auth=auth,
             )
             if not response.is_success:
-                raise XApiError(response.status_code, f"OAuth2 refresh failed: {response.text}", "POST", TOKEN_URL)
+                reason = response.text[:300]
+                try:
+                    payload = response.json()
+                    reason = payload.get("error_description") or payload.get("error") or reason
+                except Exception:
+                    pass
+                self.disabled_reason = f"X rejected the OAuth 2.0 refresh token ({reason})"
+                print(f"[oauth2] {self.disabled_reason}", flush=True)
+                raise OAuth2Unavailable(self.disabled_reason)
             body = response.json()
             self._tokens = OAuth2Tokens(
                 client_id=self._tokens.client_id,

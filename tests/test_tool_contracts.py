@@ -167,3 +167,56 @@ def test_max_results_bounds_match_the_x_api() -> None:
         schema = input_schema(TOOL_INDEX[name])
         assert schema["properties"]["max_results"]["minimum"] == 1, name
         assert schema["properties"]["max_results"]["maximum"] == 1000, name
+
+class _StubOAuth2:
+    def __init__(self, available: bool = True, reason: str = "") -> None:
+        self.available = available
+        self.disabled_reason = reason
+
+    async def request(self, *args: object, **kwargs: object) -> dict:
+        raise AssertionError("should not be called")
+
+
+def test_write_tools_prefer_oauth2_and_reads_prefer_oauth1() -> None:
+    runner = ToolRunner(client=None, oauth2=_StubOAuth2(available=True))  # type: ignore[arg-type]
+    assert runner._transports(TOOL_INDEX["post_tweet"]) == ["oauth2", "oauth1"]
+    assert runner._transports(TOOL_INDEX["get_user"]) == ["oauth1", "oauth2"]
+    assert runner._transports(TOOL_INDEX["x_api_request"]) == ["oauth2", "oauth1"]
+
+
+def test_broken_oauth2_is_skipped_and_reported() -> None:
+    broken = _StubOAuth2(available=False, reason="X rejected the OAuth 2.0 refresh token")
+    runner = ToolRunner(client=None, oauth2=broken)  # type: ignore[arg-type]
+    assert runner._transports(TOOL_INDEX["post_tweet"]) == ["oauth1"]
+    assert runner._transports(TOOL_INDEX["x_api_request"]) == ["oauth1"]
+    try:
+        runner._transports(TOOL_INDEX["upload_media"])
+    except RuntimeError as exc:
+        assert "rejected the OAuth 2.0 refresh token" in str(exc)
+    else:
+        raise AssertionError("expected a RuntimeError for an unusable OAuth 2.0 client")
+
+
+def test_dispatch_falls_back_to_oauth1_when_oauth2_is_unavailable() -> None:
+    class BrokenOAuth2(_StubOAuth2):
+        async def request(self, *args: object, **kwargs: object) -> dict:
+            from twitter_mcp.errors import OAuth2Unavailable
+
+            raise OAuth2Unavailable("refresh token rejected")
+
+    class WorkingOAuth1:
+        async def request(self, *args: object, **kwargs: object) -> dict:
+            return {"data": [{"id": "1"}]}
+
+    runner = ToolRunner(client=WorkingOAuth1(), oauth2=BrokenOAuth2())  # type: ignore[arg-type]
+    result = asyncio.run(runner._dispatch(["oauth2", "oauth1"], "GET", "/2/users/me"))
+    assert result == {"data": [{"id": "1"}]}
+
+
+def test_post_errors_carry_actionable_hints() -> None:
+    from twitter_mcp.errors import XApiError
+
+    error = XApiError(400, "Invalid Request", "POST", "/2/tweets")
+    assert "Read and write permissions" in str(error)
+    assert "credit balance" in str(error)
+    assert "POST /2/tweets" in str(error)

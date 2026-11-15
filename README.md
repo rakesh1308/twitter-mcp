@@ -105,6 +105,35 @@ Tokens auto-refresh on expiry and persist to `TWITTER_OAUTH2_TOKEN_FILE` (mount 
 `/data` on Zeabur). When both transports are configured the server picks the working one automatically and
 falls back to the other on a 401/403.
 
+
+## Minting OAuth 2.0 tokens
+
+The OAuth 2.0 variables must hold a token pair that X itself issued. The helper script runs the
+authorization code flow with PKCE, waits for the redirect on localhost and prints the environment
+variables to paste into Vercel:
+
+```bash
+python scripts/oauth2_bootstrap.py --client-id <CLIENT_ID> --client-secret <CLIENT_SECRET>
+```
+
+Register `http://localhost:8765/callback` as a redirect URI for the app in the developer portal first.
+The script prints the exact `vercel env add` values for `TWITTER_OAUTH2_ACCESS_TOKEN`,
+`TWITTER_OAUTH2_REFRESH_TOKEN` and `TWITTER_OAUTH2_SCOPE`.
+
+If X rejects the refresh token the server keeps working on OAuth 1.0a and reports the reason on the
+next OAuth 2.0 call instead of failing every request.
+
+## Troubleshooting posting
+
+`POST /2/tweets` (post, reply, quote) is rejected by X when
+
+- the app is set to **Read only** in the developer portal - switch it to **Read and write**;
+- the developer account has no credit balance on the current pay-per-use pricing - check
+  `get_usage_credits` (`GET /2/usage/credits`);
+- the token was not minted with `tweet.write` - re-authorize with the scope string above;
+- the reply target does not exist or is not visible to the account - `reply_to_tweet` needs a real,
+  visible tweet id.
+
 ## Deploy to Vercel
 
 The `twitter-mcp` Vercel project is already connected to `rakesh1308/twitter-mcp` with `main` as the production
@@ -220,20 +249,20 @@ python -m twitter_mcp
 
 ```
 twitter-mcp/
-â”œâ”€â”€ api/index.py            # Vercel serverless entrypoint
-â”œâ”€â”€ src/twitter_mcp/
-â”‚   â”œâ”€â”€ api.py              # tool catalog (posts, users, likes, lists, media, trends, ...)
-â”‚   â”œâ”€â”€ api_extended.py     # tool catalog (chat, broadcasts, calls, bots, compliance, ...)
-â”‚   â”œâ”€â”€ server.py           # ASGI app, MCP JSON-RPC, tool dispatch, coverage report
-â”‚   â”œâ”€â”€ oauth1.py           # async OAuth 1.0a client
-â”‚   â”œâ”€â”€ oauth2.py           # async OAuth 2.0 client with token refresh
-â”‚   â”œâ”€â”€ config.py           # environment -> typed config
-â”‚   â”œâ”€â”€ errors.py           # shared X API error type
-â”‚   â””â”€â”€ x_api_operations.json  # snapshot of the official OpenAPI operations
-â”œâ”€â”€ tests/                  # contract + coverage tests
-â”œâ”€â”€ vercel.json
-â”œâ”€â”€ requirements.txt
-â””â”€â”€ Dockerfile
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ api/index.py            # Vercel serverless entrypoint
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ src/twitter_mcp/
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ api.py              # tool catalog (posts, users, likes, lists, media, trends, ...)
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ api_extended.py     # tool catalog (chat, broadcasts, calls, bots, compliance, ...)
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ server.py           # ASGI app, MCP JSON-RPC, tool dispatch, coverage report
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ oauth1.py           # async OAuth 1.0a client
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ oauth2.py           # async OAuth 2.0 client with token refresh
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ config.py           # environment -> typed config
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ errors.py           # shared X API error type
+Ã¢â€â€š   Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ x_api_operations.json  # snapshot of the official OpenAPI operations
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ tests/                  # contract + coverage tests
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ vercel.json
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ requirements.txt
+Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ Dockerfile
 ```
 
 ## License
