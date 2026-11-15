@@ -1,4 +1,4 @@
-"""OAuth 2.0 client with token persistence and auto-refresh."""
+"""OAuth 2.0 client with token persistence, auto-refresh and a generic request method."""
 
 from __future__ import annotations
 
@@ -6,14 +6,16 @@ import asyncio
 import json
 import os
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
 import httpx
 
-TOKEN_URL = "https://api.twitter.com/2/oauth2/token"
-API_BASE = "https://api.twitter.com/2"
+from .errors import XApiError
+
+TOKEN_URL = "https://api.x.com/2/oauth2/token"
+API_BASE = "https://api.x.com"
 
 
 @dataclass
@@ -50,9 +52,8 @@ class OAuth2Client:
     def __init__(self, tokens: OAuth2Tokens, opts: OAuth2Options) -> None:
         self._tokens = tokens
         self._opts = opts
-        self._client = httpx.Client(base_url=API_BASE, timeout=30.0)
-        self._async_client = httpx.AsyncClient(base_url=API_BASE, timeout=30.0)
-        self._refresh_lock = False
+        self._client = httpx.AsyncClient(base_url=API_BASE, timeout=30.0)
+        self._refresh_lock = asyncio.Lock()
 
     @classmethod
     def from_env(cls) -> "OAuth2Client | None":
@@ -79,10 +80,8 @@ class OAuth2Client:
         client._load_or_seed()
         return client
 
-    def close(self) -> None:
-        self._client.close()
-        if not self._async_client.is_closed:
-            asyncio.run(self._async_client.aclose())
+    async def aclose(self) -> None:
+        await self._client.aclose()
 
     # ---- persistence -----------------------------------------------------
 
@@ -126,69 +125,101 @@ class OAuth2Client:
         except Exception as err:
             print(f"[oauth2] persist failed: {err}", flush=True)
 
-    # ---- refresh ----------------------------------------------------------
+    # ---- refresh ---------------------------------------------------------
 
     def _is_expired(self) -> bool:
         return (self._tokens.expires_at * 1000) - time.time() * 1000 < self._opts.refresh_skew_seconds * 1000
 
-    async def _refresh_async(self) -> None:
-        auth = httpx.BasicAuth(self._tokens.client_id, self._tokens.client_secret)
-        response = await self._client_async.post(
-            TOKEN_URL,
-            data={"grant_type": "refresh_token", "refresh_token": self._tokens.refresh_token},
-            auth=auth,
-        )
-        if not response.is_success:
-            raise RuntimeError(f"OAuth2 refresh failed: {response.status_code} {response.text}")
-        body = response.json()
-        self._tokens = OAuth2Tokens(
-            client_id=self._tokens.client_id,
-            client_secret=self._tokens.client_secret,
-            access_token=body["access_token"],
-            refresh_token=body.get("refresh_token", self._tokens.refresh_token),
-            expires_at=int(time.time()) + int(body.get("expires_in", 7200)),
-            scope=body.get("scope", self._tokens.scope),
-        )
-        self._persist()
-
-    @property
-    def _client_async(self) -> httpx.AsyncClient:
-        return self._async_client
+    async def _refresh(self) -> None:
+        async with self._refresh_lock:
+            if not self._is_expired():
+                return
+            auth = httpx.BasicAuth(self._tokens.client_id, self._tokens.client_secret)
+            response = await self._client.post(
+                TOKEN_URL,
+                data={"grant_type": "refresh_token", "refresh_token": self._tokens.refresh_token},
+                auth=auth,
+            )
+            if not response.is_success:
+                raise XApiError(response.status_code, f"OAuth2 refresh failed: {response.text}", "POST", TOKEN_URL)
+            body = response.json()
+            self._tokens = OAuth2Tokens(
+                client_id=self._tokens.client_id,
+                client_secret=self._tokens.client_secret,
+                access_token=body["access_token"],
+                refresh_token=body.get("refresh_token", self._tokens.refresh_token),
+                expires_at=int(time.time()) + int(body.get("expires_in", 7200)),
+                scope=body.get("scope", self._tokens.scope),
+            )
+            self._persist()
 
     async def _ensure_token(self) -> str:
-        if self._is_expired():
-            await self._refresh_async()
+        await self._refresh()
         return self._tokens.access_token
 
-    # ---- API --------------------------------------------------------------
+    # ---- transport -------------------------------------------------------
 
-    async def _request(self, method: str, path: str, **kwargs: Any) -> Any:
-        await self._ensure_token()
-        headers = dict(kwargs.pop("headers", {}) or {})
-        headers["Authorization"] = f"Bearer {self._tokens.access_token}"
-        if "json" in kwargs and "Content-Type" not in headers:
-            headers["Content-Type"] = "application/json"
-        response = await self._client_async.request(method, path, headers=headers, **kwargs)
+    async def request(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: dict[str, Any] | None = None,
+        json_body: dict[str, Any] | None = None,
+        files: dict[str, Any] | None = None,
+        data: dict[str, Any] | None = None,
+    ) -> Any:
+        token = await self._ensure_token()
+        response = await self._client.request(
+            method,
+            path,
+            params=params,
+            json=json_body,
+            files=files,
+            data=data,
+            headers={"Authorization": f"Bearer {token}"},
+        )
         if response.status_code == 401:
-            await self._refresh_async()
-            headers["Authorization"] = f"Bearer {self._tokens.access_token}"
-            response = await self._client_async.request(method, path, headers=headers, **kwargs)
-        if not response.is_success and response.status_code != 204:
-            detail = response.reason_phrase
-            try:
-                data = response.json()
-                if isinstance(data, dict):
-                    detail = data.get("detail") or data.get("error") or detail
-            except Exception:
-                detail = response.text or detail
-            raise RuntimeError(f"Twitter API error: {response.status_code} - {detail}")
-        return {} if response.status_code == 204 else response.json()
+            self._tokens.expires_at = 0
+            await self._refresh()
+            response = await self._client.request(
+                method,
+                path,
+                params=params,
+                json=json_body,
+                files=files,
+                data=data,
+                headers={"Authorization": f"Bearer {self._tokens.access_token}"},
+            )
+        if response.status_code == 204:
+            return {}
+        if not response.is_success:
+            raise self._error(response, method, path)
+        if not response.content:
+            return {}
+        try:
+            return response.json()
+        except ValueError:
+            return {"data": response.text}
+
+    @staticmethod
+    def _error(response: httpx.Response, method: str, path: str) -> XApiError:
+        detail = response.reason_phrase
+        try:
+            payload = response.json()
+            if isinstance(payload, dict):
+                detail = payload.get("detail") or payload.get("error") or payload.get("title") or detail
+        except Exception:
+            detail = response.text or detail
+        return XApiError(response.status_code, str(detail), method, path)
+
+    # ---- convenience -----------------------------------------------------
 
     async def follow_user(self, my_user_id: str, target_user_id: str) -> None:
-        await self._request("POST", f"/users/{my_user_id}/following", json={"target_user_id": target_user_id})
+        await self.request("POST", f"/2/users/{my_user_id}/following", json_body={"target_user_id": target_user_id})
 
     async def unfollow_user(self, my_user_id: str, target_user_id: str) -> None:
-        await self._request("DELETE", f"/users/{my_user_id}/following/{target_user_id}")
+        await self.request("DELETE", f"/2/users/{my_user_id}/following/{target_user_id}")
 
     async def get_following(
         self,
@@ -196,10 +227,13 @@ class OAuth2Client:
         max_results: int = 100,
         pagination_token: str | None = None,
     ) -> dict[str, Any]:
-        params = {"max_results": str(max_results), "user.fields": "id,name,username,description,public_metrics,verified,profile_image_url"}
+        params: dict[str, Any] = {
+            "max_results": str(max_results),
+            "user.fields": "id,name,username,description,public_metrics,verified,profile_image_url",
+        }
         if pagination_token:
             params["pagination_token"] = pagination_token
-        return await self._request("GET", f"/users/{my_user_id}/following", params=params)
+        return await self.request("GET", f"/2/users/{my_user_id}/following", params=params)
 
     async def get_followers(
         self,
@@ -207,10 +241,13 @@ class OAuth2Client:
         max_results: int = 100,
         pagination_token: str | None = None,
     ) -> dict[str, Any]:
-        params = {"max_results": str(max_results), "user.fields": "id,name,username,description,public_metrics,verified,profile_image_url"}
+        params: dict[str, Any] = {
+            "max_results": str(max_results),
+            "user.fields": "id,name,username,description,public_metrics,verified,profile_image_url",
+        }
         if pagination_token:
             params["pagination_token"] = pagination_token
-        return await self._request("GET", f"/users/{my_user_id}/followers", params=params)
+        return await self.request("GET", f"/2/users/{my_user_id}/followers", params=params)
 
 
 def _parse_expires(raw: str | None) -> int:
@@ -222,7 +259,8 @@ def _parse_expires(raw: str | None) -> int:
         return n // 1000 if n > 1_000_000_000_000 else n
     try:
         from datetime import datetime, timezone
-        dt = datetime.fromisoformat(trimmed.replace("Z", "+00:00"))
+
+        dt = datetime.fromisoformat(trimmed.replace("Z", "++00:00"))
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
         return int(dt.timestamp())

@@ -1,317 +1,548 @@
-"""MCP server — Streamable HTTP at /mcp, plus / and /health."""
+"""MCP server — Streamable HTTP JSON-RPC at /mcp.
+
+The tool catalog lives in :mod:`twitter_mcp.api`; this module turns it into
+MCP tool schemas, dispatches calls to the X API and serves the ASGI app that
+both uvicorn (Docker / Zeabur) and Vercel use.
+"""
 
 from __future__ import annotations
 
-import asyncio
+import base64
 import json
 import os
-import sys
-from typing import Any, Callable
+import re
+from pathlib import Path
+from typing import Any
+from urllib.parse import quote
 
-import httpx
 import uvicorn
 from starlette.applications import Starlette
+from starlette.middleware import Middleware
+from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
-from .config import load_config
+from .api import TOOLS, TOOL_INDEX, Tool
+from .config import OAuth1Account, load_config
+from .errors import XApiError
 from .oauth1 import TwitterClient
 from .oauth2 import OAuth2Client
 
-API_VERSION = "2025-03-26"
+PROTOCOL_VERSION = "2025-03-26"
+SERVER_NAME = "twitter-mcp-server"
+SERVER_VERSION = "2.0.0"
+
+# Where a user facing parameter is placed in the JSON body of the request.
+# Anything not listed maps to a body field with the same name.
+BODY_PATHS: dict[str, dict[str, tuple[str, ...]]] = {
+    "post_tweet": {
+        "in_reply_to_tweet_id": ("reply", "in_reply_to_tweet_id"),
+        "media_ids": ("media", "media_ids"),
+    },
+    "reply_to_tweet": {
+        "tweet_id": ("reply", "in_reply_to_tweet_id"),
+        "media_ids": ("media", "media_ids"),
+    },
+    "follow_user": {"user_id": ("target_user_id",)},
+    "block_user": {"user_id": ("target_user_id",)},
+    "mute_user": {"user_id": ("target_user_id",)},
+    "block_dms": {"user_id": ("target_user_id",)},
+    "unblock_dms": {"user_id": ("target_user_id",)},
+    "create_dm_conversation": {"media_ids": ("media", "media_ids")},
+    "send_dm_by_participant": {"media_ids": ("media", "media_ids")},
+    "send_dm_by_conversation": {"media_ids": ("media", "media_ids")},
+    "create_media_subtitles": {"subtitles_base64": ("subtitles",)},
+}
+
+OUTPUT_SCHEMAS: dict[str, dict[str, Any]] = {
+    "json": {"type": "object", "additionalProperties": True},
+    "tweet": {
+        "type": "object",
+        "properties": {
+            "id": {"type": "string"},
+            "text": {"type": "string"},
+            "created_at": {"type": "string"},
+        },
+        "required": ["id"],
+        "additionalProperties": True,
+    },
+    "tweet_list": {
+        "type": "object",
+        "properties": {
+            "data": {"type": "array", "items": {"type": "object", "additionalProperties": True}},
+            "meta": {"type": "object", "additionalProperties": True},
+            "includes": {"type": "object", "additionalProperties": True},
+        },
+        "additionalProperties": True,
+    },
+    "user": {
+        "type": "object",
+        "properties": {
+            "id": {"type": "string"},
+            "username": {"type": "string"},
+            "name": {"type": "string"},
+        },
+        "required": ["id"],
+        "additionalProperties": True,
+    },
+    "user_list": {
+        "type": "object",
+        "properties": {
+            "data": {"type": "array", "items": {"type": "object", "additionalProperties": True}},
+            "meta": {"type": "object", "additionalProperties": True},
+        },
+        "additionalProperties": True,
+    },
+    "success": {
+        "type": "object",
+        "properties": {"success": {"type": "boolean"}},
+        "required": ["success"],
+        "additionalProperties": True,
+    },
+    "counts": {
+        "type": "object",
+        "properties": {
+            "total": {"type": "integer"},
+            "data": {"type": "array", "items": {"type": "object", "additionalProperties": True}},
+        },
+        "additionalProperties": True,
+    },
+    "media": {
+        "type": "object",
+        "properties": {
+            "media_id": {"type": "string"},
+            "media_key": {"type": "string"},
+            "id": {"type": "string"},
+        },
+        "additionalProperties": True,
+    },
+}
 
 
-def _json(payload: Any) -> str:
-    return json.dumps(payload, indent=2, ensure_ascii=False, default=str)
+# ---------------------------------------------------------------------------
+# schemas
+# ---------------------------------------------------------------------------
 
 
-def build_handlers(client: TwitterClient, oauth2: OAuth2Client | None) -> dict[str, Callable[..., Any]]:
-    handlers: dict[str, Callable[..., Any]] = {}
+def input_schema(tool: Tool) -> dict[str, Any]:
+    properties: dict[str, Any] = {}
+    required: list[str] = []
+    for param in tool.params:
+        schema: dict[str, Any] = {"type": param.type}
+        if param.description:
+            schema["description"] = param.description
+        if param.enum:
+            schema["enum"] = list(param.enum)
+        if param.minimum is not None:
+            schema["minimum"] = param.minimum
+        if param.maximum is not None:
+            schema["maximum"] = param.maximum
+        if param.default is not None:
+            schema["default"] = param.default
+        properties[param.name] = schema
+        if param.required:
+            required.append(param.name)
+    schema_out: dict[str, Any] = {"type": "object", "properties": properties}
+    if required:
+        schema_out["required"] = required
+    return schema_out
 
-    def _text(payload: Any) -> dict[str, Any]:
-        if isinstance(payload, str):
-            text = payload
+
+def tool_definition(tool: Tool) -> dict[str, Any]:
+    return {
+        "name": tool.name,
+        "description": tool.description,
+        "inputSchema": input_schema(tool),
+        "outputSchema": OUTPUT_SCHEMAS.get(tool.output, OUTPUT_SCHEMAS["json"]),
+    }
+
+
+# ---------------------------------------------------------------------------
+# coverage reporting
+# ---------------------------------------------------------------------------
+
+
+def _normalise_path(path: str) -> str:
+    return re.sub(r"\{[^}]+\}", "{}", path)
+
+
+def coverage_report() -> dict[str, Any]:
+    snapshot_path = Path(__file__).with_name("x_api_operations.json")
+    snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+    operations = snapshot["operations"]
+
+    curated = {
+        (tool.method.upper(), _normalise_path(tool.path))
+        for tool in TOOLS
+        if tool.name != "x_api_request"
+    }
+
+    families: dict[str, dict[str, int]] = {}
+    matched: list[dict[str, Any]] = []
+    via_generic: list[dict[str, Any]] = []
+    for operation in operations:
+        key = (operation["method"], _normalise_path(operation["path"]))
+        bucket = families.setdefault(operation["family"], {"total": 0, "curated": 0, "via_generic": 0})
+        bucket["total"] += 1
+        if key in curated:
+            bucket["curated"] += 1
+            matched.append(operation)
         else:
-            text = _json(payload)
-        return {"content": [{"type": "text", "text": text}], "_payload": payload}
+            bucket["via_generic"] += 1
+            via_generic.append(operation)
 
-    def _err(message: str) -> dict[str, Any]:
-        return {"content": [{"type": "text", "text": json.dumps({"error": message})}], "isError": True}
+    total = len(operations)
+    return {
+        "spec": {
+            "title": snapshot.get("spec_title"),
+            "version": snapshot.get("spec_version"),
+            "source": snapshot.get("source"),
+            "generated": snapshot.get("generated"),
+        },
+        "total_operations": total,
+        "curated_operations": len(matched),
+        "via_generic_tool": len(via_generic),
+        "reachable_operations": total,
+        "coverage_pct": round(100.0 * len(matched) / total, 1) if total else 0.0,
+        "curated_tools": len([t for t in TOOLS if t.name != "x_api_request"]),
+        "total_tools": len(TOOLS),
+        "families": families,
+        "curated_missing_examples": via_generic[:25],
+    }
 
-    def post_tweet(text: str) -> dict[str, Any]:
-        return _text(client.post_tweet(text))
 
-    def reply_to_tweet(tweet_id: str, text: str) -> dict[str, Any]:
-        return _text(client.reply_to_tweet(tweet_id, text))
+# ---------------------------------------------------------------------------
+# tool runner
+# ---------------------------------------------------------------------------
 
-    def get_tweet(tweet_id: str) -> dict[str, Any]:
-        return _text(client.get_tweet(tweet_id))
 
-    def search_tweets(query: str, max_results: int = 10) -> dict[str, Any]:
-        return _text(client.search_tweets(query, max_results))
+class ToolRunner:
+    def __init__(self, client: TwitterClient, oauth2: OAuth2Client | None) -> None:
+        self.client = client
+        self.oauth2 = oauth2
 
-    def search_all_tweets(query: str, max_results: int = 10) -> dict[str, Any]:
-        return _text(client.search_all_tweets(query, max_results))
+    # -- transport selection ---------------------------------------------
 
-    def get_user(username: str) -> dict[str, Any]:
-        return _text(client.get_user_by_username(username))
+    def _transports(self, tool: Tool) -> list[str]:
+        if tool.auth == "oauth2":
+            if self.oauth2 is None:
+                raise RuntimeError(
+                    f"Tool '{tool.name}' needs OAuth 2.0 (scope: {', '.join(tool.scopes) or 'oauth2'}). "
+                    "Set the TWITTER_OAUTH2_* environment variables."
+                )
+            return ["oauth2"]
+        if tool.auth == "auto":
+            return ["oauth2", "oauth1"] if self.oauth2 is not None else ["oauth1"]
+        return ["oauth1", "oauth2"] if self.oauth2 is not None else ["oauth1"]
 
-    def get_user_tweets(username: str, max_results: int = 10) -> dict[str, Any]:
-        user = client.get_user_by_username(username)
-        return _text(client.get_user_tweets(user["id"], max_results))
+    async def _dispatch(self, transports: list[str], method: str, path: str, **kwargs: Any) -> Any:
+        last_error: Exception | None = None
+        for index, transport in enumerate(transports):
+            try:
+                if transport == "oauth1":
+                    return await self.client.request(method, path, **kwargs)
+                assert self.oauth2 is not None
+                return await self.oauth2.request(method, path, **kwargs)
+            except XApiError as exc:
+                last_error = exc
+                if not exc.auth_error or index == len(transports) - 1:
+                    raise
+        raise last_error or RuntimeError("no transport available")
 
-    def retweet(tweet_id: str, user_id: str) -> dict[str, Any]:
-        client.retweet(tweet_id, user_id)
-        return _text({"success": True, "message": f"Retweeted {tweet_id}"})
+    # -- parameter preparation -------------------------------------------
 
-    def like_tweet(tweet_id: str, user_id: str) -> dict[str, Any]:
-        client.like_tweet(tweet_id, user_id)
-        return _text({"success": True, "message": f"Liked {tweet_id}"})
+    async def _prepare(self, tool: Tool, args: dict[str, Any]) -> dict[str, Any]:
+        query: dict[str, Any] = {}
+        body: dict[str, Any] = {}
+        files: dict[str, Any] | None = None
+        data: dict[str, Any] | None = None
+        path = tool.path
+        overrides = BODY_PATHS.get(tool.name, {})
 
-    def delete_tweet(tweet_id: str) -> dict[str, Any]:
-        client.delete_tweet(tweet_id)
-        return _text({"success": True, "message": f"Deleted {tweet_id}"})
+        for param in tool.params:
+            value = args.get(param.name)
+            if value is None and param.default is not None:
+                value = param.default
+            if value is None:
+                continue
+            if param.name == "payload" and isinstance(value, dict):
+                body.update(value)
+                continue
+            target = overrides.get(param.name, (param.name,))
+            if target[0] in tool.body_params:
+                _assign(body, target, value)
+            else:
+                query[param.api_name or param.name] = value
 
-    def list_accounts() -> dict[str, Any]:
-        return _text({"account": client.name})
+        # path parameters
+        for name in tool.path_params:
+            if name == "me":
+                me = await self.client.get_me()
+                path = path.replace("{me}", quote(str(me["id"]), safe=""))
+                continue
+            value = args.get(name)
+            if value is None:
+                param = next((p for p in tool.params if p.name == name), None)
+                value = param.default if param is not None else None
+            if value is None:
+                raise ValueError(f"Missing required path parameter: {name}")
+            path = path.replace("{" + name + "}", quote(str(value), safe=""))
 
-    handlers.update(
-        post_tweet=post_tweet,
-        reply_to_tweet=reply_to_tweet,
-        get_tweet=get_tweet,
-        search_tweets=search_tweets,
-        search_all_tweets=search_all_tweets,
-        get_user=get_user,
-        get_user_tweets=get_user_tweets,
-        retweet=retweet,
-        like_tweet=like_tweet,
-        delete_tweet=delete_tweet,
-        list_accounts=list_accounts,
-    )
+        # username alias -> user id
+        if tool.name == "get_user_tweets" and "user_id" not in args:
+            username = args.get("username")
+            if username:
+                user = await self.client.get_user_by_username(str(username))
+                path = path.replace("{user_id}", quote(str(user["id"]), safe=""))
 
-    if oauth2 is not None:
-        async def follow_user(user_id: str) -> dict[str, Any]:
-            assert oauth2 is not None
-            me = client.get_me()
-            await oauth2.follow_user(me["id"], user_id)
-            return _text({"success": True, "followed": user_id})
+        # multipart uploads
+        if tool.name == "upload_media":
+            payload = base64.b64decode(str(args["media_base64"]))
+            files = {"media": (args.get("filename") or "upload.png", payload, args.get("media_type") or "image/png")}
+            data = {"media_category": args.get("media_category") or "tweet_image"}
+            if args.get("additional_owners"):
+                data["additional_owners"] = json.dumps(args["additional_owners"])
+        elif tool.name == "upload_compliance_submission" and args.get("file_base64"):
+            payload = base64.b64decode(str(args["file_base64"]))
+            files = {"file": (args.get("file_name") or "ids.txt", payload, "text/plain")}
 
-        async def unfollow_user(user_id: str) -> dict[str, Any]:
-            assert oauth2 is not None
-            me = client.get_me()
-            await oauth2.unfollow_user(me["id"], user_id)
-            return _text({"success": True, "unfollowed": user_id})
+        return {"path": path, "query": query, "body": body or None, "files": files, "data": data}
 
-        async def get_following(max_results: int = 100, pagination_token: str | None = None) -> dict[str, Any]:
-            assert oauth2 is not None
-            me = client.get_me()
-            res = await oauth2.get_following(me["id"], max_results, pagination_token)
-            return _text({
-                "count": len(res.get("data") or []),
-                "next_token": (res.get("meta") or {}).get("next_token"),
-                "users": res.get("data") or [],
-            })
+    # -- raw passthrough --------------------------------------------------
 
-        async def get_followers(max_results: int = 100, pagination_token: str | None = None) -> dict[str, Any]:
-            assert oauth2 is not None
-            me = client.get_me()
-            res = await oauth2.get_followers(me["id"], max_results, pagination_token)
-            return _text({
-                "count": len(res.get("data") or []),
-                "next_token": (res.get("meta") or {}).get("next_token"),
-                "users": res.get("data") or [],
-            })
+    async def _raw(self, args: dict[str, Any]) -> Any:
+        method = str(args.get("method", "GET")).upper()
+        path = str(args.get("path", "")).strip()
+        if not path.startswith("/") or "://" in path or path.startswith("//"):
+            raise ValueError("path must be a relative path, for example /2/users/123/liked_tweets")
+        if not re.match(r"^/(2|1\.1|oauth2)/", path):
+            raise ValueError("path must start with /2/, /1.1/ or /oauth2/")
+        query = args.get("query") or {}
+        body = args.get("body")
+        if not isinstance(query, dict):
+            raise ValueError("query must be an object")
+        if body is not None and not isinstance(body, dict):
+            raise ValueError("body must be an object")
 
-        handlers.update(
-            follow_user=follow_user,
-            unfollow_user=unfollow_user,
-            get_following=get_following,
-            get_followers=get_followers,
+        choice = str(args.get("auth") or "auto")
+        if choice == "oauth2":
+            if self.oauth2 is None:
+                raise RuntimeError("OAuth 2.0 is not configured on this server")
+            transports = ["oauth2"]
+        elif choice == "oauth1":
+            transports = ["oauth1"]
+        else:
+            transports = ["oauth2", "oauth1"] if self.oauth2 is not None else ["oauth1"]
+        return await self._dispatch(transports, method, path, params=query, json_body=body)
+
+    # -- entry point ------------------------------------------------------
+
+    async def run(self, tool: Tool, args: dict[str, Any]) -> Any:
+        if tool.name == "x_api_request":
+            return await self._raw(args)
+        prepared = await self._prepare(tool, args)
+        transports = self._transports(tool)
+        return await self._dispatch(
+            transports,
+            tool.method,
+            prepared["path"],
+            params=prepared["query"],
+            json_body=prepared["body"],
+            files=prepared["files"],
+            data=prepared["data"],
         )
 
-    return handlers
+
+def _assign(target: dict[str, Any], path: tuple[str, ...], value: Any) -> None:
+    cursor = target
+    for key in path[:-1]:
+        cursor = cursor.setdefault(key, {})
+    cursor[path[-1]] = value
 
 
-SUCCESS_OUTPUT: dict[str, Any] = {
-    "type": "object",
-    "properties": {
-        "success": {"type": "boolean", "const": True},
-        "message": {"type": "string"},
-    },
-    "required": ["success"],
-    "additionalProperties": True,
-}
-
-TWEET_OUTPUT: dict[str, Any] = {
-    "type": "object",
-    "properties": {
-        "id": {"type": "string"},
-        "text": {"type": "string"},
-        "created_at": {"type": "string"},
-    },
-    "required": ["id"],
-    "additionalProperties": True,
-}
-
-SEARCH_OUTPUT: dict[str, Any] = {
-    "type": "object",
-    "properties": {
-        "count": {"type": "integer"},
-        "tweets": {"type": "array", "items": {"type": "object", "additionalProperties": True}},
-    },
-    "required": ["count"],
-    "additionalProperties": True,
-}
-
-USER_OUTPUT: dict[str, Any] = {
-    "type": "object",
-    "properties": {
-        "id": {"type": "string"},
-        "username": {"type": "string"},
-        "name": {"type": "string"},
-    },
-    "required": ["id", "username"],
-    "additionalProperties": True,
-}
-
-USER_LIST_OUTPUT: dict[str, Any] = {
-    "type": "object",
-    "properties": {
-        "count": {"type": "integer"},
-        "next_token": {"type": ["string", "null"]},
-        "users": {"type": "array", "items": {"type": "object", "additionalProperties": True}},
-    },
-    "required": ["count", "users"],
-    "additionalProperties": True,
-}
-
-ACCOUNT_OUTPUT: dict[str, Any] = {
-    "type": "object",
-    "properties": {"account": {"type": "string"}},
-    "required": ["account"],
-    "additionalProperties": True,
-}
+# ---------------------------------------------------------------------------
+# application
+# ---------------------------------------------------------------------------
 
 
-TOOL_SCHEMAS: list[dict[str, Any]] = [
-    {"name": "post_tweet", "description": "Post a new tweet. text: tweet text (max 280 chars).", "params": {"text": "string"}, "required": ["text"], "output": TWEET_OUTPUT},
-    {"name": "reply_to_tweet", "description": "Reply to a tweet. tweet_id, text.", "params": {"tweet_id": "string", "text": "string"}, "required": ["tweet_id", "text"], "output": TWEET_OUTPUT},
-    {"name": "get_tweet", "description": "Get tweet details. tweet_id.", "params": {"tweet_id": "string"}, "required": ["tweet_id"], "output": TWEET_OUTPUT},
-    {"name": "search_tweets", "description": "Search recent tweets. query, max_results (1-100, default 10).", "params": {"query": "string", "max_results": "int"}, "required": ["query"], "output": SEARCH_OUTPUT},
-    {"name": "search_all_tweets", "description": "Search all tweets (elevated API). query, max_results (1-100, default 10).", "params": {"query": "string", "max_results": "int"}, "required": ["query"], "output": SEARCH_OUTPUT},
-    {"name": "get_user", "description": "Get user info by username. username (no @).", "params": {"username": "string"}, "required": ["username"], "output": USER_OUTPUT},
-    {"name": "get_user_tweets", "description": "Get recent tweets from a user. username, max_results (1-100, default 10).", "params": {"username": "string", "max_results": "int"}, "required": ["username"], "output": SEARCH_OUTPUT},
-    {"name": "retweet", "description": "Retweet a tweet. tweet_id, user_id (your numeric ID).", "params": {"tweet_id": "string", "user_id": "string"}, "required": ["tweet_id", "user_id"], "output": SUCCESS_OUTPUT},
-    {"name": "like_tweet", "description": "Like a tweet. tweet_id, user_id.", "params": {"tweet_id": "string", "user_id": "string"}, "required": ["tweet_id", "user_id"], "output": SUCCESS_OUTPUT},
-    {"name": "delete_tweet", "description": "Delete one of your tweets. tweet_id.", "params": {"tweet_id": "string"}, "required": ["tweet_id"], "output": SUCCESS_OUTPUT},
-    {"name": "list_accounts", "description": "Show configured account.", "params": {}, "required": [], "output": ACCOUNT_OUTPUT},
-    {"name": "follow_user", "description": "Follow a user (OAuth 2.0). user_id.", "params": {"user_id": "string"}, "required": ["user_id"], "oauth2": True, "output": SUCCESS_OUTPUT},
-    {"name": "unfollow_user", "description": "Unfollow a user (OAuth 2.0). user_id.", "params": {"user_id": "string"}, "required": ["user_id"], "oauth2": True, "output": SUCCESS_OUTPUT},
-    {"name": "get_following", "description": "List accounts you follow (OAuth 2.0). max_results, pagination_token.", "params": {"max_results": "int", "pagination_token": "string"}, "required": [], "oauth2": True, "output": USER_LIST_OUTPUT},
-    {"name": "get_followers", "description": "List accounts following you (OAuth 2.0). max_results, pagination_token.", "params": {"max_results": "int", "pagination_token": "string"}, "required": [], "oauth2": True, "output": USER_LIST_OUTPUT},
-]
+def create_app(client: TwitterClient | None = None, oauth2: OAuth2Client | None = None) -> Starlette:
+    if client is None:
+        try:
+            account = load_config().account
+        except Exception:
+            account = OAuth1Account(
+                name=os.getenv("ACCOUNT_NAME") or "Twitter Account",
+                api_key=os.getenv("TWITTER_API_KEY") or "",
+                api_secret=os.getenv("TWITTER_API_SECRET") or "",
+                access_token=os.getenv("TWITTER_ACCESS_TOKEN") or "",
+                access_token_secret=os.getenv("TWITTER_ACCESS_TOKEN_SECRET") or "",
+            )
+        client = TwitterClient(account)
+    if oauth2 is None:
+        oauth2 = OAuth2Client.from_env()
+
+    runner = ToolRunner(client, oauth2)
+    schemas = [tool_definition(tool) for tool in TOOLS]
+
+    def _route_of(path: str) -> str:
+        if path.endswith("/mcp"):
+            return "mcp"
+        if path.endswith("/health"):
+            return "health"
+        if path.endswith("/tools-manifest.json"):
+            return "manifest"
+        if path.endswith("/api-coverage"):
+            return "coverage"
+        return "root"
+
+    async def endpoint(request: Request) -> Response:
+        route = _route_of(request.url.path)
+
+        if route == "health":
+            return JSONResponse(
+                {
+                    "status": "healthy",
+                    "account": client.name,
+                    "oauth1": "configured" if client.account.api_key else "missing",
+                    "oauth2": "configured" if oauth2 is not None else "disabled",
+                    "tools": len(TOOLS),
+                }
+            )
+
+        if route == "manifest":
+            return JSONResponse({"server": SERVER_NAME, "version": SERVER_VERSION, "tools": schemas})
+
+        if route == "coverage":
+            return JSONResponse(coverage_report())
+
+        if route == "root":
+            return JSONResponse(
+                {
+                    "name": "Twitter MCP Server",
+                    "version": SERVER_VERSION,
+                    "description": "MCP server for the X API v2 (OAuth 1.0a + optional OAuth 2.0)",
+                    "account": client.name,
+                    "oauth2": "configured" if oauth2 is not None else "disabled",
+                    "tools": len(TOOLS),
+                    "endpoints": {"health": "/health", "mcp": "/mcp", "manifest": "/tools-manifest.json", "coverage": "/api-coverage"},
+                }
+            )
+
+        # MCP JSON-RPC
+        if request.method == "DELETE":
+            return Response(status_code=204)
+        if request.method != "POST":
+            return JSONResponse(
+                {"error": "Use POST for MCP JSON-RPC requests"},
+                status_code=405,
+                headers={"Allow": "POST, DELETE"},
+            )
+        try:
+            body = await request.json()
+        except Exception:
+            return JSONResponse(
+                {"jsonrpc": "2.0", "id": None, "error": {"code": -32600, "message": "Invalid request"}},
+                status_code=400,
+            )
+
+        method = body.get("method")
+        request_id = body.get("id")
+
+        if request_id is None:
+            # notification - no response body
+            return Response(status_code=202)
+
+        if method == "initialize":
+            return JSONResponse(
+                {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "result": {
+                        "protocolVersion": PROTOCOL_VERSION,
+                        "capabilities": {"tools": {"listChanged": False}},
+                        "serverInfo": {"name": SERVER_NAME, "version": SERVER_VERSION},
+                    },
+                }
+            )
+        if method == "ping":
+            return JSONResponse({"jsonrpc": "2.0", "id": request_id, "result": {}})
+        if method == "tools/list":
+            return JSONResponse({"jsonrpc": "2.0", "id": request_id, "result": {"tools": schemas}})
+        if method == "resources/list":
+            return JSONResponse({"jsonrpc": "2.0", "id": request_id, "result": {"resources": []}})
+        if method == "prompts/list":
+            return JSONResponse({"jsonrpc": "2.0", "id": request_id, "result": {"prompts": []}})
+        if method == "tools/call":
+            params = body.get("params") or {}
+            name = params.get("name")
+            arguments = params.get("arguments") or {}
+            tool = TOOL_INDEX.get(name)
+            if tool is None:
+                return JSONResponse(
+                    {"jsonrpc": "2.0", "id": request_id, "error": {"code": -32601, "message": f"Unknown tool: {name}"}}
+                )
+            try:
+                payload = await runner.run(tool, arguments)
+            except Exception as exc:
+                return JSONResponse(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": request_id,
+                        "result": {
+                            "content": [{"type": "text", "text": json.dumps({"error": str(exc)})}],
+                            "isError": True,
+                        },
+                    }
+                )
+            if payload is None:
+                payload = {"success": True}
+            elif isinstance(payload, dict) and not payload:
+                payload = {"success": True}
+            text = payload if isinstance(payload, str) else json.dumps(payload, indent=2, ensure_ascii=False, default=str)
+            return JSONResponse(
+                {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "result": {
+                        "content": [{"type": "text", "text": text}],
+                        "structuredContent": payload if isinstance(payload, dict) else {"result": payload},
+                    },
+                }
+            )
+        return JSONResponse(
+            {"jsonrpc": "2.0", "id": request_id, "error": {"code": -32601, "message": "Method not found"}}
+        )
+
+    app = Starlette(
+        routes=[Route("/{path:path}", endpoint, methods=["GET", "POST", "DELETE", "OPTIONS"])],
+        middleware=[
+            Middleware(
+                CORSMiddleware,
+                allow_origins=["*"],
+                allow_methods=["*"],
+                allow_headers=["*"],
+            )
+        ],
+    )
+    app.state.client = client
+    app.state.oauth2 = oauth2
+    app.state.runner = runner
+    return app
 
 
-def tool_schemas(include_oauth2: bool) -> list[dict[str, Any]]:
-    return [t for t in TOOL_SCHEMAS if include_oauth2 or not t.get("oauth2")]
+app = create_app()
 
 
 def main() -> None:
     cfg = load_config()
-    client = TwitterClient(cfg.account)
-    oauth2 = OAuth2Client.from_env()
-    handlers = build_handlers(client, oauth2)
-    schemas = tool_schemas(oauth2 is not None)
-    host = cfg.host
-    port = cfg.port
-
-    async def mcp_endpoint(request: Request) -> JSONResponse:
-        try:
-            body = await request.json()
-        except Exception:
-            return JSONResponse({"jsonrpc": "2.0", "id": None, "error": {"code": -32600, "message": "Invalid request"}})
-        method = body.get("method")
-        rid = body.get("id")
-        if method == "initialize":
-            return JSONResponse({
-                "jsonrpc": "2.0",
-                "id": rid,
-                "result": {
-                    "protocolVersion": API_VERSION,
-                    "capabilities": {"tools": {}},
-                    "serverInfo": {"name": "twitter-mcp-server", "version": "1.0.0"},
-                },
-            })
-        if method == "tools/list":
-            tools = [
-                {
-                    "name": t["name"],
-                    "description": t["description"],
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {k: {"type": "string" if v == "string" else "number"} for k, v in t["params"].items()},
-                        **({"required": t["required"]} if t["required"] else {}),
-                    },
-                    "outputSchema": t["output"],
-                }
-                for t in schemas
-            ]
-            return JSONResponse({"jsonrpc": "2.0", "id": rid, "result": {"tools": tools}})
-        if method == "tools/call":
-            params = body.get("params") or {}
-            name = params.get("name")
-            args = params.get("arguments") or {}
-            handler = handlers.get(name)
-            if handler is None:
-                return JSONResponse({"jsonrpc": "2.0", "id": rid, "error": {"code": -32601, "message": f"Unknown tool: {name}"}})
-            try:
-                result = handler(**args)
-                if asyncio.iscoroutine(result):
-                    result = await result
-                structured = result.pop("_payload", None)
-                response: dict[str, Any] = {"jsonrpc": "2.0", "id": rid, "result": result}
-                if structured is not None:
-                    response["result"]["structuredContent"] = structured
-                return JSONResponse(response)
-            except Exception as exc:
-                return JSONResponse({
-                    "jsonrpc": "2.0",
-                    "id": rid,
-                    "result": {
-                        "content": [{"type": "text", "text": json.dumps({"error": str(exc)})}],
-                        "isError": True,
-                    },
-                })
-        if method == "ping":
-            return JSONResponse({"jsonrpc": "2.0", "id": rid, "result": {}})
-        return JSONResponse({"jsonrpc": "2.0", "id": rid, "error": {"code": -32601, "message": "Method not found"}})
-
-    async def health(_request: Request) -> JSONResponse:
-        return JSONResponse({
-            "status": "healthy",
-            "account": client.name,
-            "oauth2": "configured" if oauth2 is not None else "disabled",
-        })
-
-    async def root(_request: Request) -> JSONResponse:
-        return JSONResponse({
-            "name": "Twitter MCP Server",
-            "version": "1.0.0",
-            "description": "MCP server for Twitter API v2 (OAuth 1.0a + optional OAuth 2.0)",
-            "account": client.name,
-            "oauth2": "configured" if oauth2 is not None else "disabled",
-            "endpoints": {"health": "/health", "mcp": "/mcp"},
-        })
-
-    app = Starlette(routes=[
-        Route("/", root, methods=["GET"]),
-        Route("/health", health, methods=["GET"]),
-        Route("/mcp", mcp_endpoint, methods=["POST", "GET", "DELETE"]),
-    ])
-
-    print(f"[mcp] Twitter MCP Server listening on http://{host}:{port}/mcp (account={client.name}, oauth2={'on' if oauth2 else 'off'})", flush=True)
-    uvicorn.run(app, host=host, port=port, log_level="warning")
+    application = create_app()
+    print(
+        f"[mcp] Twitter MCP Server listening on http://{cfg.host}:{cfg.port}/mcp "
+        f"(account={cfg.account.name}, tools={len(TOOLS)})",
+        flush=True,
+    )
+    uvicorn.run(application, host=cfg.host, port=cfg.port, log_level="warning")
 
 
 if __name__ == "__main__":

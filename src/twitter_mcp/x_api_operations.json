@@ -1,0 +1,2497 @@
+{
+ "spec_title": "X API v2",
+ "spec_version": "2.174",
+ "spec_server": "https://api.x.com",
+ "source": "https://api.x.com/2/openapi.json",
+ "generated": "2026-11-15",
+ "operations": [
+  {
+   "method": "GET",
+   "path": "/2/account",
+   "family": "Account",
+   "operationId": "getDeveloperAccount",
+   "scopes": [
+    "developer.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/account",
+   "family": "Account",
+   "operationId": "ensureAccount",
+   "scopes": [
+    "developer.write"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/account_activity/subscriptions/count",
+   "family": "Account Activity",
+   "operationId": "getAccountActivitySubscriptionCount",
+   "scopes": []
+  },
+  {
+   "method": "GET",
+   "path": "/2/account_activity/webhooks/{webhook_id}/subscriptions/all",
+   "family": "Account Activity",
+   "operationId": "validateAccountActivitySubscription",
+   "scopes": [
+    "dm.read",
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/account_activity/webhooks/{webhook_id}/subscriptions/all",
+   "family": "Account Activity",
+   "operationId": "createAccountActivitySubscription",
+   "scopes": [
+    "dm.read",
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/account_activity/webhooks/{webhook_id}/subscriptions/all/list",
+   "family": "Account Activity",
+   "operationId": "getAccountActivitySubscriptions",
+   "scopes": []
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/account_activity/webhooks/{webhook_id}/subscriptions/{user_id}/all",
+   "family": "Account Activity",
+   "operationId": "deleteAccountActivitySubscription",
+   "scopes": []
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/activity/subscriptions",
+   "family": "Activity",
+   "operationId": "deleteActivitySubscriptionsByIds",
+   "scopes": []
+  },
+  {
+   "method": "GET",
+   "path": "/2/activity/subscriptions",
+   "family": "Activity",
+   "operationId": "getActivitySubscriptions",
+   "scopes": [
+    "like.read",
+    "tweet.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/activity/subscriptions",
+   "family": "Activity",
+   "operationId": "createActivitySubscription",
+   "scopes": []
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/activity/subscriptions/{subscription_id}",
+   "family": "Activity",
+   "operationId": "deleteActivitySubscription",
+   "scopes": []
+  },
+  {
+   "method": "PUT",
+   "path": "/2/activity/subscriptions/{subscription_id}",
+   "family": "Activity",
+   "operationId": "updateActivitySubscription",
+   "scopes": []
+  },
+  {
+   "method": "POST",
+   "path": "/2/articles/draft",
+   "family": "Articles",
+   "operationId": "articleCreateDraft",
+   "scopes": []
+  },
+  {
+   "method": "POST",
+   "path": "/2/articles/{article_id}/publish",
+   "family": "Articles",
+   "operationId": "articlePublish",
+   "scopes": [
+    "tweet.write"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/bots",
+   "family": "Bots",
+   "operationId": "getBots",
+   "scopes": []
+  },
+  {
+   "method": "POST",
+   "path": "/2/bots",
+   "family": "Bots",
+   "operationId": "createBot",
+   "scopes": []
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/bots/{id}",
+   "family": "Bots",
+   "operationId": "deleteBot",
+   "scopes": []
+  },
+  {
+   "method": "PUT",
+   "path": "/2/bots/{id}",
+   "family": "Bots",
+   "operationId": "updateBot",
+   "scopes": []
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/bots/{id}/token",
+   "family": "Bots",
+   "operationId": "revokeBotToken",
+   "scopes": []
+  },
+  {
+   "method": "POST",
+   "path": "/2/bots/{id}/token",
+   "family": "Bots",
+   "operationId": "rotateBotToken",
+   "scopes": []
+  },
+  {
+   "method": "GET",
+   "path": "/2/broadcasts",
+   "family": "Broadcasts",
+   "operationId": "listBroadcasts",
+   "scopes": [
+    "broadcast.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/broadcasts",
+   "family": "Broadcasts",
+   "operationId": "createBroadcast",
+   "scopes": [
+    "broadcast.read",
+    "broadcast.write"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/broadcasts/categories",
+   "family": "Broadcasts",
+   "operationId": "listLiveCategories",
+   "scopes": [
+    "broadcast.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/broadcasts/chat/moderators",
+   "family": "Broadcasts",
+   "operationId": "getChatModerators",
+   "scopes": [
+    "broadcast.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/broadcasts/chat/moderators",
+   "family": "Broadcasts",
+   "operationId": "addChatModerator",
+   "scopes": [
+    "broadcast.read",
+    "broadcast.write"
+   ]
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/broadcasts/chat/moderators/{user_id}",
+   "family": "Broadcasts",
+   "operationId": "removeChatModerator",
+   "scopes": [
+    "broadcast.read",
+    "broadcast.write"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/broadcasts/chat/mutes",
+   "family": "Broadcasts",
+   "operationId": "getChatMutedUsers",
+   "scopes": [
+    "broadcast.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/broadcasts/chat/mutes",
+   "family": "Broadcasts",
+   "operationId": "muteChatUser",
+   "scopes": [
+    "broadcast.read",
+    "broadcast.write"
+   ]
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/broadcasts/chat/mutes/{user_id}",
+   "family": "Broadcasts",
+   "operationId": "unmuteChatUser",
+   "scopes": [
+    "broadcast.read",
+    "broadcast.write"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/broadcasts/scheduled",
+   "family": "Broadcasts",
+   "operationId": "listScheduledBroadcasts",
+   "scopes": [
+    "broadcast.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/broadcasts/scheduled",
+   "family": "Broadcasts",
+   "operationId": "createScheduledBroadcast",
+   "scopes": [
+    "broadcast.read",
+    "broadcast.write"
+   ]
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/broadcasts/scheduled/{id}",
+   "family": "Broadcasts",
+   "operationId": "deleteScheduledBroadcast",
+   "scopes": [
+    "broadcast.read",
+    "broadcast.write"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/broadcasts/scheduled/{id}",
+   "family": "Broadcasts",
+   "operationId": "getScheduledBroadcast",
+   "scopes": [
+    "broadcast.read"
+   ]
+  },
+  {
+   "method": "PUT",
+   "path": "/2/broadcasts/scheduled/{id}",
+   "family": "Broadcasts",
+   "operationId": "updateScheduledBroadcast",
+   "scopes": [
+    "broadcast.read",
+    "broadcast.write"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/broadcasts/scheduled/{id}/live",
+   "family": "Broadcasts",
+   "operationId": "goLiveScheduledBroadcast",
+   "scopes": [
+    "broadcast.read",
+    "broadcast.write"
+   ]
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/broadcasts/{id}",
+   "family": "Broadcasts",
+   "operationId": "deleteBroadcast",
+   "scopes": [
+    "broadcast.read",
+    "broadcast.write"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/broadcasts/{id}",
+   "family": "Broadcasts",
+   "operationId": "getBroadcast",
+   "scopes": [
+    "broadcast.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/broadcasts/{id}/chat",
+   "family": "Broadcasts",
+   "operationId": "getBroadcastChat",
+   "scopes": [
+    "broadcast.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/broadcasts/{id}/chat",
+   "family": "Broadcasts",
+   "operationId": "sendBroadcastChat",
+   "scopes": [
+    "broadcast.read",
+    "broadcast.write"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/broadcasts/{id}/chat/mutes",
+   "family": "Broadcasts",
+   "operationId": "muteBroadcastChatUser",
+   "scopes": [
+    "broadcast.read",
+    "broadcast.write"
+   ]
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/broadcasts/{id}/chat/mutes/{user_id}",
+   "family": "Broadcasts",
+   "operationId": "unmuteBroadcastChatUser",
+   "scopes": [
+    "broadcast.read",
+    "broadcast.write"
+   ]
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/broadcasts/{id}/chat/{message_id}",
+   "family": "Broadcasts",
+   "operationId": "deleteBroadcastChatMessage",
+   "scopes": [
+    "broadcast.read",
+    "broadcast.write"
+   ]
+  },
+  {
+   "method": "PUT",
+   "path": "/2/broadcasts/{id}/state",
+   "family": "Broadcasts",
+   "operationId": "updateBroadcastState",
+   "scopes": [
+    "broadcast.read",
+    "broadcast.write"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/region",
+   "family": "Broadcasts",
+   "operationId": "getRegion",
+   "scopes": [
+    "broadcast.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/sources",
+   "family": "Broadcasts",
+   "operationId": "listSources",
+   "scopes": [
+    "broadcast.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/sources",
+   "family": "Broadcasts",
+   "operationId": "createSource",
+   "scopes": [
+    "broadcast.read",
+    "broadcast.write"
+   ]
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/sources/{id}",
+   "family": "Broadcasts",
+   "operationId": "deleteSource",
+   "scopes": [
+    "broadcast.read",
+    "broadcast.write"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/sources/{id}",
+   "family": "Broadcasts",
+   "operationId": "getSource",
+   "scopes": [
+    "broadcast.read"
+   ]
+  },
+  {
+   "method": "PUT",
+   "path": "/2/sources/{id}",
+   "family": "Broadcasts",
+   "operationId": "updateSource",
+   "scopes": [
+    "broadcast.read",
+    "broadcast.write"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/sources/{id}/stream_key",
+   "family": "Broadcasts",
+   "operationId": "getSourceStreamKey",
+   "scopes": [
+    "broadcast.read",
+    "broadcast.write"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/users/{id}/broadcasts",
+   "family": "Broadcasts",
+   "operationId": "listUserBroadcasts",
+   "scopes": [
+    "broadcast.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/users/{id}/broadcasts",
+   "family": "Broadcasts",
+   "operationId": "createUserBroadcast",
+   "scopes": [
+    "broadcast.read",
+    "broadcast.write"
+   ]
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/users/{id}/broadcasts/{broadcast_id}",
+   "family": "Broadcasts",
+   "operationId": "deleteUserBroadcast",
+   "scopes": [
+    "broadcast.read",
+    "broadcast.write"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/users/{id}/broadcasts/{broadcast_id}",
+   "family": "Broadcasts",
+   "operationId": "getUserBroadcast",
+   "scopes": [
+    "broadcast.read"
+   ]
+  },
+  {
+   "method": "PUT",
+   "path": "/2/users/{id}/broadcasts/{broadcast_id}/state",
+   "family": "Broadcasts",
+   "operationId": "updateUserBroadcastState",
+   "scopes": [
+    "broadcast.read",
+    "broadcast.write"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/users/{id}/sources",
+   "family": "Broadcasts",
+   "operationId": "listUserSources",
+   "scopes": [
+    "broadcast.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/users/{id}/sources",
+   "family": "Broadcasts",
+   "operationId": "createUserSource",
+   "scopes": [
+    "broadcast.read",
+    "broadcast.write"
+   ]
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/users/{id}/sources/{source_id}",
+   "family": "Broadcasts",
+   "operationId": "deleteUserSource",
+   "scopes": [
+    "broadcast.read",
+    "broadcast.write"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/users/{id}/sources/{source_id}",
+   "family": "Broadcasts",
+   "operationId": "getUserSource",
+   "scopes": [
+    "broadcast.read"
+   ]
+  },
+  {
+   "method": "PUT",
+   "path": "/2/users/{id}/sources/{source_id}",
+   "family": "Broadcasts",
+   "operationId": "updateUserSource",
+   "scopes": [
+    "broadcast.read",
+    "broadcast.write"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/calls",
+   "family": "Calls",
+   "operationId": "createCall",
+   "scopes": [
+    "calls.write"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/calls/scheduled",
+   "family": "Calls",
+   "operationId": "listScheduledCalls",
+   "scopes": [
+    "calls.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/calls/scheduled",
+   "family": "Calls",
+   "operationId": "scheduleCall",
+   "scopes": [
+    "calls.write"
+   ]
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/calls/scheduled/{id}",
+   "family": "Calls",
+   "operationId": "cancelScheduledCall",
+   "scopes": [
+    "calls.write"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/calls/scheduled/{id}",
+   "family": "Calls",
+   "operationId": "getScheduledCall",
+   "scopes": [
+    "calls.read"
+   ]
+  },
+  {
+   "method": "PUT",
+   "path": "/2/calls/scheduled/{id}",
+   "family": "Calls",
+   "operationId": "updateScheduledCall",
+   "scopes": [
+    "calls.write"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/calls/scheduled/{id}/rsvp",
+   "family": "Calls",
+   "operationId": "respondToScheduledCall",
+   "scopes": [
+    "calls.write"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/calls/{id}",
+   "family": "Calls",
+   "operationId": "getCall",
+   "scopes": [
+    "calls.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/calls/{id}/join",
+   "family": "Calls",
+   "operationId": "joinCall",
+   "scopes": [
+    "calls.join"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/calls/{id}/leave",
+   "family": "Calls",
+   "operationId": "leaveCall",
+   "scopes": [
+    "calls.join"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/chat/conversations",
+   "family": "Chat",
+   "operationId": "getChatConversations",
+   "scopes": [
+    "dm.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/chat/conversations/group",
+   "family": "Chat",
+   "operationId": "createChatConversation",
+   "scopes": [
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/chat/conversations/group/initialize",
+   "family": "Chat",
+   "operationId": "initializeChatGroup",
+   "scopes": [
+    "dm.write"
+   ]
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/chat/conversations/{id}",
+   "family": "Chat",
+   "operationId": "deleteChatConversation",
+   "scopes": [
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/chat/conversations/{id}",
+   "family": "Chat",
+   "operationId": "getChatConversation",
+   "scopes": [
+    "dm.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "PUT",
+   "path": "/2/chat/conversations/{id}",
+   "family": "Chat",
+   "operationId": "updateChatGroup",
+   "scopes": [
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/chat/conversations/{id}/admin_requests",
+   "family": "Chat",
+   "operationId": "getChatGroupAdminRequests",
+   "scopes": [
+    "dm.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/chat/conversations/{id}/admin_requests",
+   "family": "Chat",
+   "operationId": "createChatGroupAdminRequest",
+   "scopes": [
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/chat/conversations/{id}/admin_requests/{user_id}/approve",
+   "family": "Chat",
+   "operationId": "approveChatGroupAdminRequest",
+   "scopes": [
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/chat/conversations/{id}/admin_requests/{user_id}/reject",
+   "family": "Chat",
+   "operationId": "rejectChatGroupAdminRequest",
+   "scopes": [
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "PUT",
+   "path": "/2/chat/conversations/{id}/admin_settings",
+   "family": "Chat",
+   "operationId": "updateChatGroupAdminSettings",
+   "scopes": [
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/chat/conversations/{id}/admins",
+   "family": "Chat",
+   "operationId": "addChatGroupAdmins",
+   "scopes": [
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/chat/conversations/{id}/admins/remove",
+   "family": "Chat",
+   "operationId": "removeChatGroupAdmins",
+   "scopes": [
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/chat/conversations/{id}/archive",
+   "family": "Chat",
+   "operationId": "unarchiveChatConversation",
+   "scopes": [
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/chat/conversations/{id}/archive",
+   "family": "Chat",
+   "operationId": "archiveChatConversation",
+   "scopes": [
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/chat/conversations/{id}/events",
+   "family": "Chat",
+   "operationId": "getChatConversationEvents",
+   "scopes": [
+    "dm.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/chat/conversations/{id}/invite",
+   "family": "Chat",
+   "operationId": "disableChatGroupInvite",
+   "scopes": [
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/chat/conversations/{id}/invite",
+   "family": "Chat",
+   "operationId": "enableChatGroupInvite",
+   "scopes": [
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/chat/conversations/{id}/invites/{token}",
+   "family": "Chat",
+   "operationId": "getChatGroupInvite",
+   "scopes": [
+    "dm.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/chat/conversations/{id}/join_requests",
+   "family": "Chat",
+   "operationId": "createChatGroupJoinRequest",
+   "scopes": [
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/chat/conversations/{id}/join_requests/reject",
+   "family": "Chat",
+   "operationId": "rejectChatGroupJoinRequests",
+   "scopes": [
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/chat/conversations/{id}/keys",
+   "family": "Chat",
+   "operationId": "addConversationKeys",
+   "scopes": [
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/chat/conversations/{id}/members",
+   "family": "Chat",
+   "operationId": "addChatGroupMembers",
+   "scopes": [
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/chat/conversations/{id}/members/remove",
+   "family": "Chat",
+   "operationId": "removeChatGroupMembers",
+   "scopes": [
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/chat/conversations/{id}/message_ttl",
+   "family": "Chat",
+   "operationId": "deleteChatConversationMessageTtl",
+   "scopes": [
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "PUT",
+   "path": "/2/chat/conversations/{id}/message_ttl",
+   "family": "Chat",
+   "operationId": "updateChatConversationMessageTtl",
+   "scopes": [
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/chat/conversations/{id}/messages",
+   "family": "Chat",
+   "operationId": "sendChatMessage",
+   "scopes": [
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/chat/conversations/{id}/messages/delete",
+   "family": "Chat",
+   "operationId": "deleteChatMessages",
+   "scopes": [
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/chat/conversations/{id}/mute",
+   "family": "Chat",
+   "operationId": "unmuteChatConversation",
+   "scopes": [
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/chat/conversations/{id}/mute",
+   "family": "Chat",
+   "operationId": "muteChatConversation",
+   "scopes": [
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/chat/conversations/{id}/pinned_messages",
+   "family": "Chat",
+   "operationId": "getChatConversationPinnedMessages",
+   "scopes": [
+    "dm.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/chat/conversations/{id}/read",
+   "family": "Chat",
+   "operationId": "markChatConversationRead",
+   "scopes": [
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "PUT",
+   "path": "/2/chat/conversations/{id}/screen_capture",
+   "family": "Chat",
+   "operationId": "updateChatConversationScreenCapture",
+   "scopes": [
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/chat/conversations/{id}/typing",
+   "family": "Chat",
+   "operationId": "sendChatTypingIndicator",
+   "scopes": [
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/chat/conversations/{id}/unread",
+   "family": "Chat",
+   "operationId": "markChatConversationUnread",
+   "scopes": [
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/chat/media/upload/initialize",
+   "family": "Chat",
+   "operationId": "chatMediaUploadInitialize",
+   "scopes": [
+    "media.write"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/chat/media/upload/{id}/append",
+   "family": "Chat",
+   "operationId": "chatMediaUploadAppend",
+   "scopes": [
+    "media.write"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/chat/media/upload/{id}/finalize",
+   "family": "Chat",
+   "operationId": "chatMediaUploadFinalize",
+   "scopes": [
+    "media.write"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/chat/media/{id}/{media_hash_key}",
+   "family": "Chat",
+   "operationId": "chatMediaDownload",
+   "scopes": [
+    "media.write"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/chat/message_requests",
+   "family": "Chat",
+   "operationId": "getChatMessageRequests",
+   "scopes": [
+    "dm.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/chat/message_requests/{id}",
+   "family": "Chat",
+   "operationId": "getChatMessageRequest",
+   "scopes": [
+    "dm.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/chat/message_requests/{id}/accept",
+   "family": "Chat",
+   "operationId": "acceptChatMessageRequest",
+   "scopes": [
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/chat/settings",
+   "family": "Chat",
+   "operationId": "getChatSettings",
+   "scopes": [
+    "dm.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "PUT",
+   "path": "/2/chat/settings",
+   "family": "Chat",
+   "operationId": "updateChatSettings",
+   "scopes": [
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/users/{id}/public_keys",
+   "family": "Chat",
+   "operationId": "addUserPublicKey",
+   "scopes": [
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/communities/search",
+   "family": "Communities",
+   "operationId": "searchCommunities",
+   "scopes": [
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/communities/{id}",
+   "family": "Communities",
+   "operationId": "getCommunitiesById",
+   "scopes": [
+    "list.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/notes",
+   "family": "Community Notes",
+   "operationId": "createCommunityNotes",
+   "scopes": [
+    "tweet.write"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/notes/evaluate",
+   "family": "Community Notes",
+   "operationId": "evaluateCommunityNotes",
+   "scopes": [
+    "tweet.write"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/notes/search/notes_written",
+   "family": "Community Notes",
+   "operationId": "searchCommunityNotesWritten",
+   "scopes": [
+    "tweet.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/notes/search/posts_eligible_for_notes",
+   "family": "Community Notes",
+   "operationId": "searchEligiblePosts",
+   "scopes": [
+    "tweet.read"
+   ]
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/notes/{id}",
+   "family": "Community Notes",
+   "operationId": "deleteCommunityNotes",
+   "scopes": [
+    "tweet.write"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/compliance/jobs",
+   "family": "Compliance",
+   "operationId": "getComplianceJobs",
+   "scopes": []
+  },
+  {
+   "method": "POST",
+   "path": "/2/compliance/jobs",
+   "family": "Compliance",
+   "operationId": "createComplianceJobs",
+   "scopes": []
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/compliance/jobs/{id}",
+   "family": "Compliance",
+   "operationId": "deleteComplianceJobsById",
+   "scopes": []
+  },
+  {
+   "method": "GET",
+   "path": "/2/compliance/jobs/{id}",
+   "family": "Compliance",
+   "operationId": "getComplianceJobsById",
+   "scopes": []
+  },
+  {
+   "method": "GET",
+   "path": "/2/compliance/jobs/{id}/download",
+   "family": "Compliance",
+   "operationId": "downloadComplianceJobResults",
+   "scopes": []
+  },
+  {
+   "method": "PUT",
+   "path": "/2/compliance/jobs/{id}/upload",
+   "family": "Compliance",
+   "operationId": "uploadComplianceJobSubmission",
+   "scopes": []
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/connections",
+   "family": "Connections",
+   "operationId": "deleteConnectionsByUuids",
+   "scopes": []
+  },
+  {
+   "method": "GET",
+   "path": "/2/connections",
+   "family": "Connections",
+   "operationId": "getConnectionHistory",
+   "scopes": []
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/connections/all",
+   "family": "Connections",
+   "operationId": "deleteAllConnections",
+   "scopes": []
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/connections/{endpoint_id}",
+   "family": "Connections",
+   "operationId": "deleteConnectionsByEndpoint",
+   "scopes": []
+  },
+  {
+   "method": "POST",
+   "path": "/2/dm_conversations",
+   "family": "Direct Messages",
+   "operationId": "createDirectMessagesConversation",
+   "scopes": [
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/dm_conversations/media/{dm_id}/{media_id}/{resource_id}",
+   "family": "Direct Messages",
+   "operationId": "dmConversationsMediaDownload",
+   "scopes": [
+    "dm.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/dm_conversations/with/{participant_id}/dm_events",
+   "family": "Direct Messages",
+   "operationId": "getDirectMessagesEventsByParticipantId",
+   "scopes": [
+    "dm.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/dm_conversations/with/{participant_id}/messages",
+   "family": "Direct Messages",
+   "operationId": "createDirectMessagesByParticipantId",
+   "scopes": [
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/dm_conversations/{dm_conversation_id}/messages",
+   "family": "Direct Messages",
+   "operationId": "createDirectMessagesByConversationId",
+   "scopes": [
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/dm_conversations/{id}/dm_events",
+   "family": "Direct Messages",
+   "operationId": "getDirectMessagesEventsByConversationId",
+   "scopes": [
+    "dm.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/dm_events",
+   "family": "Direct Messages",
+   "operationId": "getDirectMessagesEvents",
+   "scopes": [
+    "dm.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/dm_events/{event_id}",
+   "family": "Direct Messages",
+   "operationId": "deleteDirectMessagesEvents",
+   "scopes": [
+    "dm.read",
+    "dm.write"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/dm_events/{event_id}",
+   "family": "Direct Messages",
+   "operationId": "getDirectMessagesEventsById",
+   "scopes": [
+    "dm.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/openapi.json",
+   "family": "General",
+   "operationId": "getOpenApiSpec",
+   "scopes": []
+  },
+  {
+   "method": "POST",
+   "path": "/2/lists",
+   "family": "Lists",
+   "operationId": "createLists",
+   "scopes": [
+    "list.read",
+    "list.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/lists/{id}",
+   "family": "Lists",
+   "operationId": "deleteLists",
+   "scopes": [
+    "list.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/lists/{id}",
+   "family": "Lists",
+   "operationId": "getListsById",
+   "scopes": [
+    "list.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "PUT",
+   "path": "/2/lists/{id}",
+   "family": "Lists",
+   "operationId": "updateLists",
+   "scopes": [
+    "list.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/lists/{id}/followers",
+   "family": "Lists",
+   "operationId": "getListsFollowers",
+   "scopes": [
+    "list.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/lists/{id}/members",
+   "family": "Lists",
+   "operationId": "getListsMembers",
+   "scopes": [
+    "list.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/lists/{id}/members",
+   "family": "Lists",
+   "operationId": "addListsMember",
+   "scopes": [
+    "list.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/lists/{id}/members/{user_id}",
+   "family": "Lists",
+   "operationId": "removeListsMemberByUserId",
+   "scopes": [
+    "list.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/lists/{id}/tweets",
+   "family": "Lists",
+   "operationId": "getListsPosts",
+   "scopes": [
+    "list.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/media",
+   "family": "Media",
+   "operationId": "getMediaByMediaKeys",
+   "scopes": [
+    "tweet.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/media/analytics",
+   "family": "Media",
+   "operationId": "getMediaAnalytics",
+   "scopes": [
+    "tweet.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/media/metadata",
+   "family": "Media",
+   "operationId": "createMediaMetadata",
+   "scopes": [
+    "media.write"
+   ]
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/media/subtitles",
+   "family": "Media",
+   "operationId": "deleteMediaSubtitles",
+   "scopes": [
+    "media.write"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/media/subtitles",
+   "family": "Media",
+   "operationId": "createMediaSubtitles",
+   "scopes": [
+    "media.write"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/media/upload",
+   "family": "Media",
+   "operationId": "getMediaUploadStatus",
+   "scopes": [
+    "media.write"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/media/upload",
+   "family": "Media",
+   "operationId": "mediaUpload",
+   "scopes": [
+    "media.write"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/media/upload/initialize",
+   "family": "Media",
+   "operationId": "initializeMediaUpload",
+   "scopes": [
+    "media.write"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/media/upload/{id}/append",
+   "family": "Media",
+   "operationId": "appendMediaUpload",
+   "scopes": [
+    "media.write"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/media/upload/{id}/finalize",
+   "family": "Media",
+   "operationId": "finalizeMediaUpload",
+   "scopes": [
+    "media.write"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/media/{media_key}",
+   "family": "Media",
+   "operationId": "getMediaByMediaKey",
+   "scopes": [
+    "tweet.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/news/search",
+   "family": "News",
+   "operationId": "searchNews",
+   "scopes": [
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/news/{id}",
+   "family": "News",
+   "operationId": "getNews",
+   "scopes": [
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/tweets",
+   "family": "Posts",
+   "operationId": "getPostsByIds",
+   "scopes": [
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/tweets",
+   "family": "Posts",
+   "operationId": "createPosts",
+   "scopes": [
+    "tweet.read",
+    "tweet.write",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/tweets/analytics",
+   "family": "Posts",
+   "operationId": "getPostsAnalytics",
+   "scopes": [
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/tweets/counts/all",
+   "family": "Posts",
+   "operationId": "getPostsCountsAll",
+   "scopes": []
+  },
+  {
+   "method": "GET",
+   "path": "/2/tweets/counts/recent",
+   "family": "Posts",
+   "operationId": "getPostsCountsRecent",
+   "scopes": []
+  },
+  {
+   "method": "GET",
+   "path": "/2/tweets/search/all",
+   "family": "Posts",
+   "operationId": "searchPostsAll",
+   "scopes": [
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/tweets/search/recent",
+   "family": "Posts",
+   "operationId": "searchPostsRecent",
+   "scopes": [
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/tweets/{id}",
+   "family": "Posts",
+   "operationId": "deletePosts",
+   "scopes": [
+    "tweet.read",
+    "tweet.write",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/tweets/{id}",
+   "family": "Posts",
+   "operationId": "getPostsById",
+   "scopes": [
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/tweets/{id}/liking_users",
+   "family": "Posts",
+   "operationId": "getPostsLikingUsers",
+   "scopes": [
+    "like.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/tweets/{id}/quote_tweets",
+   "family": "Posts",
+   "operationId": "getPostsQuotedPosts",
+   "scopes": [
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/tweets/{id}/retweeted_by",
+   "family": "Posts",
+   "operationId": "getPostsRepostedBy",
+   "scopes": [
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/tweets/{id}/retweets",
+   "family": "Posts",
+   "operationId": "getPostsReposts",
+   "scopes": [
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "PUT",
+   "path": "/2/tweets/{tweet_id}/hidden",
+   "family": "Posts",
+   "operationId": "hidePostsReply",
+   "scopes": [
+    "tweet.moderate.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/spaces",
+   "family": "Spaces",
+   "operationId": "getSpacesByIds",
+   "scopes": [
+    "space.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/spaces/by/creator_ids",
+   "family": "Spaces",
+   "operationId": "getSpacesByCreatorIds",
+   "scopes": [
+    "space.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/spaces/search",
+   "family": "Spaces",
+   "operationId": "searchSpaces",
+   "scopes": [
+    "space.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/spaces/{id}",
+   "family": "Spaces",
+   "operationId": "getSpacesById",
+   "scopes": [
+    "space.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/spaces/{id}/buyers",
+   "family": "Spaces",
+   "operationId": "getSpacesBuyers",
+   "scopes": [
+    "space.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/spaces/{id}/tweets",
+   "family": "Spaces",
+   "operationId": "getSpacesPosts",
+   "scopes": [
+    "space.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/activity/stream",
+   "family": "Stream",
+   "operationId": "activityStream",
+   "scopes": []
+  },
+  {
+   "method": "GET",
+   "path": "/2/likes/compliance/stream",
+   "family": "Stream",
+   "operationId": "streamLikesCompliance",
+   "scopes": []
+  },
+  {
+   "method": "GET",
+   "path": "/2/likes/firehose/stream",
+   "family": "Stream",
+   "operationId": "streamLikesFirehose",
+   "scopes": []
+  },
+  {
+   "method": "GET",
+   "path": "/2/likes/sample10/stream",
+   "family": "Stream",
+   "operationId": "streamLikesSample10",
+   "scopes": []
+  },
+  {
+   "method": "GET",
+   "path": "/2/tweets/compliance/stream",
+   "family": "Stream",
+   "operationId": "streamPostsCompliance",
+   "scopes": []
+  },
+  {
+   "method": "GET",
+   "path": "/2/tweets/firehose/stream",
+   "family": "Stream",
+   "operationId": "streamPostsFirehose",
+   "scopes": []
+  },
+  {
+   "method": "GET",
+   "path": "/2/tweets/firehose/stream/lang/en",
+   "family": "Stream",
+   "operationId": "streamPostsFirehoseEn",
+   "scopes": []
+  },
+  {
+   "method": "GET",
+   "path": "/2/tweets/firehose/stream/lang/ja",
+   "family": "Stream",
+   "operationId": "streamPostsFirehoseJa",
+   "scopes": []
+  },
+  {
+   "method": "GET",
+   "path": "/2/tweets/firehose/stream/lang/ko",
+   "family": "Stream",
+   "operationId": "streamPostsFirehoseKo",
+   "scopes": []
+  },
+  {
+   "method": "GET",
+   "path": "/2/tweets/firehose/stream/lang/pt",
+   "family": "Stream",
+   "operationId": "streamPostsFirehosePt",
+   "scopes": []
+  },
+  {
+   "method": "GET",
+   "path": "/2/tweets/label/stream",
+   "family": "Stream",
+   "operationId": "streamLabelsCompliance",
+   "scopes": []
+  },
+  {
+   "method": "GET",
+   "path": "/2/tweets/sample/stream",
+   "family": "Stream",
+   "operationId": "streamPostsSample",
+   "scopes": []
+  },
+  {
+   "method": "GET",
+   "path": "/2/tweets/sample10/stream",
+   "family": "Stream",
+   "operationId": "streamPostsSample10",
+   "scopes": []
+  },
+  {
+   "method": "GET",
+   "path": "/2/tweets/search/stream",
+   "family": "Stream",
+   "operationId": "streamPosts",
+   "scopes": []
+  },
+  {
+   "method": "GET",
+   "path": "/2/tweets/search/stream/rules",
+   "family": "Stream",
+   "operationId": "getRules",
+   "scopes": []
+  },
+  {
+   "method": "POST",
+   "path": "/2/tweets/search/stream/rules",
+   "family": "Stream",
+   "operationId": "updateRules",
+   "scopes": []
+  },
+  {
+   "method": "GET",
+   "path": "/2/tweets/search/stream/rules/counts",
+   "family": "Stream",
+   "operationId": "getRuleCounts",
+   "scopes": []
+  },
+  {
+   "method": "GET",
+   "path": "/2/users/compliance/stream",
+   "family": "Stream",
+   "operationId": "streamUsersCompliance",
+   "scopes": []
+  },
+  {
+   "method": "GET",
+   "path": "/2/trends/by/woeid/{woeid}",
+   "family": "Trends",
+   "operationId": "getTrendsByWoeid",
+   "scopes": []
+  },
+  {
+   "method": "GET",
+   "path": "/2/users/personalized_trends",
+   "family": "Trends",
+   "operationId": "getTrendsPersonalizedTrends",
+   "scopes": [
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/usage/credits",
+   "family": "Usage",
+   "operationId": "getUsageCredits",
+   "scopes": []
+  },
+  {
+   "method": "GET",
+   "path": "/2/usage/tweets",
+   "family": "Usage",
+   "operationId": "getUsage",
+   "scopes": []
+  },
+  {
+   "method": "GET",
+   "path": "/2/users",
+   "family": "Users",
+   "operationId": "getUsersByIds",
+   "scopes": [
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/users/by",
+   "family": "Users",
+   "operationId": "getUsersByUsernames",
+   "scopes": [
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/users/by/username/{username}",
+   "family": "Users",
+   "operationId": "getUsersByUsername",
+   "scopes": [
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/users/me",
+   "family": "Users",
+   "operationId": "getUsersMe",
+   "scopes": [
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/users/me/followers",
+   "family": "Users",
+   "operationId": "getUsersMeFollowers",
+   "scopes": [
+    "follows.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/users/me/following",
+   "family": "Users",
+   "operationId": "getUsersMeFollowing",
+   "scopes": [
+    "follows.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/users/public_keys",
+   "family": "Users",
+   "operationId": "getUsersPublicKeys",
+   "scopes": [
+    "dm.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/users/reposts_of_me",
+   "family": "Users",
+   "operationId": "getUsersRepostsOfMe",
+   "scopes": [
+    "timeline.read",
+    "tweet.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/users/search",
+   "family": "Users",
+   "operationId": "searchUsers",
+   "scopes": [
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/users/{id}",
+   "family": "Users",
+   "operationId": "getUsersById",
+   "scopes": [
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/users/{id}/affiliates",
+   "family": "Users",
+   "operationId": "getUsersAffiliates",
+   "scopes": [
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/users/{id}/blocking",
+   "family": "Users",
+   "operationId": "getUsersBlocking",
+   "scopes": [
+    "block.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/users/{id}/blocking",
+   "family": "Users",
+   "operationId": "usersIdBlock",
+   "scopes": [
+    "block.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/users/{id}/bookmarks",
+   "family": "Users",
+   "operationId": "getUsersBookmarks",
+   "scopes": [
+    "bookmark.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/users/{id}/bookmarks",
+   "family": "Users",
+   "operationId": "createUsersBookmark",
+   "scopes": [
+    "bookmark.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/users/{id}/bookmarks/folders",
+   "family": "Users",
+   "operationId": "getUsersBookmarkFolders",
+   "scopes": [
+    "bookmark.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/users/{id}/bookmarks/folders",
+   "family": "Users",
+   "operationId": "createUsersBookmarkFolder",
+   "scopes": [
+    "bookmark.write",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/users/{id}/bookmarks/folders/{folder_id}",
+   "family": "Users",
+   "operationId": "getUsersBookmarksByFolderId",
+   "scopes": [
+    "bookmark.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/users/{id}/bookmarks/{tweet_id}",
+   "family": "Users",
+   "operationId": "deleteUsersBookmark",
+   "scopes": [
+    "bookmark.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/users/{id}/dm/block",
+   "family": "Users",
+   "operationId": "blockUsersDms",
+   "scopes": [
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/users/{id}/dm/unblock",
+   "family": "Users",
+   "operationId": "unblockUsersDms",
+   "scopes": [
+    "dm.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/users/{id}/followed_lists",
+   "family": "Users",
+   "operationId": "getUsersFollowedLists",
+   "scopes": [
+    "list.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/users/{id}/followed_lists",
+   "family": "Users",
+   "operationId": "followList",
+   "scopes": [
+    "list.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/users/{id}/followed_lists/{list_id}",
+   "family": "Users",
+   "operationId": "unfollowList",
+   "scopes": [
+    "list.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/users/{id}/followers",
+   "family": "Users",
+   "operationId": "getUsersFollowers",
+   "scopes": [
+    "follows.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/users/{id}/following",
+   "family": "Users",
+   "operationId": "getUsersFollowing",
+   "scopes": [
+    "follows.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/users/{id}/following",
+   "family": "Users",
+   "operationId": "followUser",
+   "scopes": [
+    "follows.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/users/{id}/liked_tweets",
+   "family": "Users",
+   "operationId": "getUsersLikedPosts",
+   "scopes": [
+    "like.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/users/{id}/likes",
+   "family": "Users",
+   "operationId": "likePost",
+   "scopes": [
+    "like.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/users/{id}/likes/{tweet_id}",
+   "family": "Users",
+   "operationId": "unlikePost",
+   "scopes": [
+    "like.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/users/{id}/list_memberships",
+   "family": "Users",
+   "operationId": "getUsersListMemberships",
+   "scopes": [
+    "list.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/users/{id}/mentions",
+   "family": "Users",
+   "operationId": "getUsersMentions",
+   "scopes": [
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/users/{id}/muting",
+   "family": "Users",
+   "operationId": "getUsersMuting",
+   "scopes": [
+    "mute.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/users/{id}/muting",
+   "family": "Users",
+   "operationId": "muteUser",
+   "scopes": [
+    "mute.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/users/{id}/owned_lists",
+   "family": "Users",
+   "operationId": "getUsersOwnedLists",
+   "scopes": [
+    "list.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/users/{id}/pinned_lists",
+   "family": "Users",
+   "operationId": "getUsersPinnedLists",
+   "scopes": [
+    "list.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/users/{id}/pinned_lists",
+   "family": "Users",
+   "operationId": "pinList",
+   "scopes": [
+    "list.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/users/{id}/pinned_lists/{list_id}",
+   "family": "Users",
+   "operationId": "unpinList",
+   "scopes": [
+    "list.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/users/{id}/public_keys",
+   "family": "Users",
+   "operationId": "getUsersPublicKey",
+   "scopes": [
+    "dm.read",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/2/users/{id}/retweets",
+   "family": "Users",
+   "operationId": "repostPost",
+   "scopes": [
+    "tweet.read",
+    "tweet.write",
+    "users.read"
+   ]
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/users/{id}/retweets/{source_tweet_id}",
+   "family": "Users",
+   "operationId": "unrepostPost",
+   "scopes": [
+    "tweet.read",
+    "tweet.write",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/users/{id}/timelines/reverse_chronological",
+   "family": "Users",
+   "operationId": "getUsersTimeline",
+   "scopes": [
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/users/{id}/tweets",
+   "family": "Users",
+   "operationId": "getUsersPosts",
+   "scopes": [
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/users/{source_user_id}/blocking/{target_user_id}",
+   "family": "Users",
+   "operationId": "usersIdUnblock",
+   "scopes": [
+    "block.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/users/{source_user_id}/following/{target_user_id}",
+   "family": "Users",
+   "operationId": "unfollowUser",
+   "scopes": [
+    "follows.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/users/{source_user_id}/muting/{target_user_id}",
+   "family": "Users",
+   "operationId": "unmuteUser",
+   "scopes": [
+    "mute.write",
+    "tweet.read",
+    "users.read"
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/2/tweets/search/webhooks",
+   "family": "Webhooks",
+   "operationId": "getWebhooksStreamLinks",
+   "scopes": []
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/tweets/search/webhooks/{webhook_id}",
+   "family": "Webhooks",
+   "operationId": "deleteWebhooksStreamLink",
+   "scopes": []
+  },
+  {
+   "method": "POST",
+   "path": "/2/tweets/search/webhooks/{webhook_id}",
+   "family": "Webhooks",
+   "operationId": "createWebhooksStreamLink",
+   "scopes": []
+  },
+  {
+   "method": "GET",
+   "path": "/2/webhooks",
+   "family": "Webhooks",
+   "operationId": "getWebhooks",
+   "scopes": []
+  },
+  {
+   "method": "POST",
+   "path": "/2/webhooks",
+   "family": "Webhooks",
+   "operationId": "createWebhooks",
+   "scopes": []
+  },
+  {
+   "method": "POST",
+   "path": "/2/webhooks/replay",
+   "family": "Webhooks",
+   "operationId": "createWebhookReplayJob",
+   "scopes": []
+  },
+  {
+   "method": "DELETE",
+   "path": "/2/webhooks/{webhook_id}",
+   "family": "Webhooks",
+   "operationId": "deleteWebhooks",
+   "scopes": []
+  },
+  {
+   "method": "PUT",
+   "path": "/2/webhooks/{webhook_id}",
+   "family": "Webhooks",
+   "operationId": "validateWebhooks",
+   "scopes": []
+  }
+ ]
+}
