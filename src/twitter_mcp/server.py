@@ -259,8 +259,12 @@ class ToolRunner:
         data: dict[str, Any] | None = None
         path = tool.path
         overrides = BODY_PATHS.get(tool.name, {})
+        path_params = set(tool.path_params)
+        excluded_from_query = path_params | set(tool.query_exclude)
 
         for param in tool.params:
+            if param.name in excluded_from_query:
+                continue
             value = args.get(param.name)
             if value is None and param.default is not None:
                 value = param.default
@@ -275,11 +279,20 @@ class ToolRunner:
             else:
                 query[param.api_name or param.name] = value
 
+        # username alias -> user id (resolved before the path is assembled)
+        alias_user_id: str | None = None
+        if tool.name == "get_user_tweets" and not args.get("user_id") and args.get("username"):
+            user = await self.client.get_user_by_username(str(args["username"]))
+            alias_user_id = str(user["id"])
+            path = path.replace("{user_id}", quote(alias_user_id, safe=""))
+
         # path parameters
         for name in tool.path_params:
             if name == "me":
                 me = await self.client.get_me()
                 path = path.replace("{me}", quote(str(me["id"]), safe=""))
+                continue
+            if name == "user_id" and alias_user_id is not None:
                 continue
             value = args.get(name)
             if value is None:
@@ -288,13 +301,6 @@ class ToolRunner:
             if value is None:
                 raise ValueError(f"Missing required path parameter: {name}")
             path = path.replace("{" + name + "}", quote(str(value), safe=""))
-
-        # username alias -> user id
-        if tool.name == "get_user_tweets" and "user_id" not in args:
-            username = args.get("username")
-            if username:
-                user = await self.client.get_user_by_username(str(username))
-                path = path.replace("{user_id}", quote(str(user["id"]), safe=""))
 
         # multipart uploads
         if tool.name == "upload_media":

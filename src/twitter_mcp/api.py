@@ -42,6 +42,7 @@ class Tool:
     body_params: tuple[str, ...] = ()
     output: str = "json"
     scopes: tuple[str, ...] = ()
+    query_exclude: tuple[str, ...] = ()
 
     @property
     def path_params(self) -> tuple[str, ...]:
@@ -92,6 +93,7 @@ def T(
     body: tuple[str, ...] = (),
     output: str = "json",
     scopes: tuple[str, ...] = (),
+    query_exclude: tuple[str, ...] = (),
 ) -> Tool:
     return Tool(
         name=name,
@@ -104,6 +106,7 @@ def T(
         body_params=body,
         output=output,
         scopes=scopes,
+        query_exclude=query_exclude,
     )
 
 
@@ -566,6 +569,7 @@ add(
         + fields(),
         output="tweet_list",
         scopes=("tweet.read", "users.read"),
+        query_exclude=("username",),
     ),
     T(
         "get_user_mentions",

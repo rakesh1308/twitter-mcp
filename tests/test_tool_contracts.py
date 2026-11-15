@@ -124,3 +124,34 @@ def test_search_query_url_is_correctly_encoded_end_to_end() -> None:
     parsed = urlparse(captured["url"])
     assert parse_qs(parsed.query)["query"] == ["cats & dogs #tag"], captured["url"]
     assert "%26" in captured["url"] and "%23" in captured["url"], captured["url"]
+
+def test_path_parameters_are_not_duplicated_in_the_query_string() -> None:
+    """Regression: a path parameter must not be sent again as a query parameter."""
+    runner = ToolRunner(client=None, oauth2=None)  # type: ignore[arg-type]
+
+    prepared = asyncio.run(runner._prepare(TOOL_INDEX["get_tweet"], {"tweet_id": "123"}))
+    assert prepared["path"] == "/2/tweets/123"
+    assert "tweet_id" not in prepared["query"]
+
+    prepared = asyncio.run(runner._prepare(TOOL_INDEX["get_user"], {"username": "xdevelopers"}))
+    assert prepared["path"] == "/2/users/by/username/xdevelopers"
+    assert "username" not in prepared["query"]
+
+    prepared = asyncio.run(runner._prepare(TOOL_INDEX["remove_list_member"], {"list_id": "9", "user_id": "7"}))
+    assert prepared["path"] == "/2/lists/9/members/7"
+    assert "list_id" not in prepared["query"] and "user_id" not in prepared["query"]
+
+
+class _StubClient:
+    async def get_user_by_username(self, username: str) -> dict:
+        return {"id": "42", "username": username}
+
+    async def get_me(self) -> dict:
+        return {"id": "99"}
+
+
+def test_username_alias_is_not_sent_as_query_parameter() -> None:
+    runner = ToolRunner(client=_StubClient(), oauth2=None)  # type: ignore[arg-type]
+    prepared = asyncio.run(runner._prepare(TOOL_INDEX["get_user_tweets"], {"username": "xdevelopers"}))
+    assert "username" not in prepared["query"]
+    assert prepared["path"] == "/2/users/42/tweets"
