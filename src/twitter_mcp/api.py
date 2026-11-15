@@ -120,9 +120,9 @@ _DEFAULT_USER_FIELDS = "name,username,profile_image_url"
 _DEFAULT_MEDIA_FIELDS = "url,preview_image_url"
 
 
-def paging(default: int = 10, maximum: int = 100) -> tuple[Param, ...]:
+def paging(default: int = 10, maximum: int = 100, minimum: int = 10) -> tuple[Param, ...]:
     return (
-        P("max_results", "integer", desc="Number of results per page.", default=default, minimum=1, maximum=maximum),
+        P("max_results", "integer", desc="Number of results per page.", default=default, minimum=minimum, maximum=maximum),
         P("pagination_token", "string", desc="Token returned by a previous call for the next page."),
     )
 
@@ -651,7 +651,7 @@ add(
         "/2/users/{me}/following",
         "List the accounts the authenticated account follows.",
         family="Users",
-        params=paging(100, 1000)
+        params=paging(100, 1000, 1)
         + (
             P("user_fields", "string", desc="Comma separated user.fields.", api_name="user.fields"),
         ),
@@ -664,7 +664,7 @@ add(
         "/2/users/{me}/followers",
         "List the accounts following the authenticated account.",
         family="Users",
-        params=paging(100, 1000)
+        params=paging(100, 1000, 1)
         + (
             P("user_fields", "string", desc="Comma separated user.fields.", api_name="user.fields"),
         ),
@@ -677,7 +677,7 @@ add(
         "/2/users/{user_id}/following",
         "List the accounts a specific user follows.",
         family="Users",
-        params=(P("user_id", "string", required=True, desc="User id."),) + paging(100, 1000),
+        params=(P("user_id", "string", required=True, desc="User id."),) + paging(100, 1000, 1),
         output="user_list",
         scopes=("follows.read", "tweet.read", "users.read"),
     ),
@@ -687,7 +687,7 @@ add(
         "/2/users/{user_id}/followers",
         "List the followers of a specific user.",
         family="Users",
-        params=(P("user_id", "string", required=True, desc="User id."),) + paging(100, 1000),
+        params=(P("user_id", "string", required=True, desc="User id."),) + paging(100, 1000, 1),
         output="user_list",
         scopes=("follows.read", "tweet.read", "users.read"),
     ),
@@ -718,7 +718,7 @@ add(
         "/2/users/{me}/blocking",
         "List the accounts blocked by the authenticated account.",
         family="Users",
-        params=paging(100, 1000),
+        params=paging(100, 1000, 1),
         output="user_list",
         scopes=("block.read", "tweet.read", "users.read"),
     ),
@@ -749,7 +749,7 @@ add(
         "/2/users/{me}/muting",
         "List the accounts muted by the authenticated account.",
         family="Users",
-        params=paging(100, 1000),
+        params=paging(100, 1000, 1),
         output="user_list",
         scopes=("mute.read", "tweet.read", "users.read"),
     ),

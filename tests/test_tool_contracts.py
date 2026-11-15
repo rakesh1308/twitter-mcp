@@ -155,3 +155,15 @@ def test_username_alias_is_not_sent_as_query_parameter() -> None:
     prepared = asyncio.run(runner._prepare(TOOL_INDEX["get_user_tweets"], {"username": "xdevelopers"}))
     assert "username" not in prepared["query"]
     assert prepared["path"] == "/2/users/42/tweets"
+
+def test_max_results_bounds_match_the_x_api() -> None:
+    """X rejects page sizes below 10 on search and user post listings."""
+    for name in ("search_tweets", "search_all_tweets", "get_user_tweets", "get_user_mentions", "get_liked_tweets"):
+        schema = input_schema(TOOL_INDEX[name])
+        assert schema["properties"]["max_results"]["minimum"] == 10, name
+        assert schema["properties"]["max_results"]["maximum"] == 100, name
+
+    for name in ("get_following", "get_followers"):
+        schema = input_schema(TOOL_INDEX[name])
+        assert schema["properties"]["max_results"]["minimum"] == 1, name
+        assert schema["properties"]["max_results"]["maximum"] == 1000, name
