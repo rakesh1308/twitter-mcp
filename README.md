@@ -96,7 +96,7 @@ Every issue found in the 1.x coverage audit is resolved:
 Recommended scope:
 
 ```
-tweet.read tweet.write users.read follows.read follows.write like.read like.write
+tweet.read tweet.write tweet.moderate.write users.read follows.read follows.write like.read like.write
 list.read list.write bookmark.read bookmark.write media.write mute.read mute.write
 block.read block.write dm.read dm.write space.read offline.access
 ```
