@@ -121,7 +121,8 @@ The script prints the exact `vercel env add` values for `TWITTER_OAUTH2_ACCESS_T
 `TWITTER_OAUTH2_REFRESH_TOKEN` and `TWITTER_OAUTH2_SCOPE`.
 
 If X rejects the refresh token the server keeps working on OAuth 1.0a and reports the reason on the
-next OAuth 2.0 call instead of failing every request.
+next OAuth 2.0 call instead of failing every request. The configured `TWITTER_OAUTH2_SCOPE` is a claim
+from the environment; it does not prove that X granted those scopes to the current access token.
 
 ## Troubleshooting posting
 
@@ -160,8 +161,11 @@ vercel --prod
 
 The MCP endpoint is then available at `https://<deployment>.vercel.app/mcp`.
 
-> Serverless note: requests are stateless, so set `TWITTER_OAUTH2_TOKEN_FILE` to a writable path (for example
-> `/tmp/oauth2.json`) on Vercel - the token is refreshed from the refresh token on every cold start.
+> Serverless note: Vercel functions can write only to temporary `/tmp` storage. The server uses
+> `/tmp/oauth2.json` there by default, but this file does not persist across cold starts or instances.
+> X can rotate refresh tokens, so a production OAuth 2.0 setup needs durable, shared token storage.
+> Until that is configured, a fresh token pair in environment variables can work temporarily, then
+> fail after refresh or a cold start. An invalid refresh token must be replaced by re-authorizing.
 
 ### Live deployment
 
@@ -173,13 +177,11 @@ The MCP endpoint is then available at `https://<deployment>.vercel.app/mcp`.
 | Tool manifest | `https://twitter-mcp-rakesh1308s-projects.vercel.app/tools-manifest.json` |
 | Vercel project | `twitter-mcp` (aliases: `twitter-mcp-delta.vercel.app`) |
 
-The deployment already carries the OAuth 1.0a credentials (`TWITTER_API_KEY`, `TWITTER_API_SECRET`,
-`TWITTER_ACCESS_TOKEN`, `TWITTER_ACCESS_TOKEN_SECRET`), so posts, searches, users, lists, bookmarks, likes,
-reposts, follows and the generic `x_api_request` escape hatch work out of the box.
-
-The OAuth 2.0 variables are not set yet. Endpoints that X only serves to OAuth 2.0 clients (trends, media
-upload, direct messages, Chat and Spaces) answer with a clear error until the `TWITTER_OAUTH2_*` variables are
-added in the Vercel dashboard; add them and redeploy to unlock those families:
+The deployment carries OAuth 1.0a credentials. OAuth 2.0 variables are also configured, but their
+current access token and refresh token must be verified with `/diagnostics`; configured does not mean
+usable. Endpoints that require OAuth 2.0 (including media uploads, direct messages, Chat and Spaces)
+need a working OAuth 2.0 user token. Re-authorize and replace the token pair if diagnostics reports
+that X rejected the refresh token:
 
 ```
 vercel env add TWITTER_OAUTH2_CLIENT_ID production

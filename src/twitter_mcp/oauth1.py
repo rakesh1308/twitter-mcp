@@ -39,6 +39,8 @@ class TwitterClient:
             ),
             timeout=timeout,
         )
+        self._app_client = httpx.AsyncClient(base_url=base_url, timeout=timeout)
+        self._app_bearer: str | None = None
         self._me: dict[str, Any] | None = None
 
     @property
@@ -47,6 +49,32 @@ class TwitterClient:
 
     async def aclose(self) -> None:
         await self._client.aclose()
+        await self._app_client.aclose()
+
+    async def request_app_only(
+        self, method: str, path: str, *, params: dict[str, Any] | None = None,
+        json_body: dict[str, Any] | None = None, files: dict[str, Any] | None = None,
+        data: dict[str, Any] | None = None,
+    ) -> Any:
+        """Use X's client-credentials bearer token for app-level read endpoints."""
+        if self._app_bearer is None:
+            response = await self._app_client.post(
+                "/oauth2/token",
+                data={"grant_type": "client_credentials"},
+                auth=httpx.BasicAuth(self.account.api_key, self.account.api_secret),
+            )
+            if not response.is_success:
+                raise self._error(response, "POST", "/oauth2/token")
+            self._app_bearer = response.json()["access_token"]
+        response = await self._app_client.request(
+            method, path, params=params, json=json_body, files=files, data=data,
+            headers={"Authorization": f"Bearer {self._app_bearer}"},
+        )
+        if response.status_code == 401:
+            self._app_bearer = None
+        if not response.is_success:
+            raise self._error(response, method, path)
+        return response.json() if response.content else {}
 
     async def request(
         self,

@@ -227,6 +227,8 @@ class ToolRunner:
     # -- transport selection ---------------------------------------------
 
     def _transports(self, tool: Tool) -> list[str]:
+        if tool.auth == "app_only":
+            return ["app_only"]
         oauth2_present = self.oauth2 is not None
         oauth2_usable = oauth2_present and self.oauth2 is not None and self.oauth2.available
 
@@ -260,6 +262,8 @@ class ToolRunner:
             try:
                 if transport == "oauth1":
                     return await self.client.request(method, path, **kwargs)
+                if transport == "app_only":
+                    return await self.client.request_app_only(method, path, **kwargs)
                 assert self.oauth2 is not None
                 return await self.oauth2.request(method, path, **kwargs)
             except OAuth2Unavailable as exc:

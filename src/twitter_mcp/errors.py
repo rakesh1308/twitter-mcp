@@ -15,12 +15,10 @@ def _describe_error(payload: dict[str, Any]) -> str:
         value = payload.get(field)
         if value:
             parts.append(f"{field}={value}")
-    if not parts:
-        for key in ("error", "errors", "message"):
-            value = payload.get(key)
-            if value:
-                parts.append(f"{key}={value}")
-                break
+    for key in ("errors", "error", "message"):
+        value = payload.get(key)
+        if value:
+            parts.append(f"{key}={value}")
     return "; ".join(parts)
 
 
@@ -52,9 +50,8 @@ _HINTS: list[tuple[str, str, str]] = [
     (
         "POST",
         "/2/tweets",
-        "X rejected the post. Check that the app has Read and write permissions, that the developer account has "
-        "an active credit balance (GET /2/usage/credits) and that the token carries tweet.write - for OAuth 2.0 "
-        "re-authorize with the scope string in the README",
+        "X rejected the post. Verify Read and write app permissions, available API credits and the user's "
+        "tweet.write grant in the X Developer Console",
     ),
     (
         "GET",
@@ -78,6 +75,8 @@ def hint_for(status_code: int, method: str, path: str, detail: str = "") -> str:
         )
     for hint_method, hint_path, hint_text in _HINTS:
         if method.upper() == hint_method and path.startswith(hint_path):
-            if status_code in (400, 403):
+            if status_code == 400 and hint_path == "/2/tweets":
+                return "Review the request fields and X's validation details above"
+            if status_code == 403:
                 return hint_text
     return ""

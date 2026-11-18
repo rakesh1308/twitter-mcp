@@ -161,6 +161,14 @@ def test_query_arrays_are_comma_separated() -> None:
     assert prepared["query"]["ids"] == "1,2"
 
 
+def test_plain_post_sends_only_text_in_json_body() -> None:
+    runner = ToolRunner(client=None, oauth2=None)  # type: ignore[arg-type]
+    prepared = asyncio.run(runner._prepare(TOOL_INDEX["post_tweet"], {"text": "Hello from the API"}))
+    assert prepared["path"] == "/2/tweets"
+    assert prepared["query"] == {}
+    assert prepared["body"] == {"text": "Hello from the API"}
+
+
 def test_multipart_fields_stay_out_of_url_and_json_body() -> None:
     runner = ToolRunner(client=None, oauth2=None)  # type: ignore[arg-type]
     prepared = asyncio.run(runner._prepare(TOOL_INDEX["upload_media"], {
@@ -241,6 +249,7 @@ def test_write_tools_prefer_oauth2_and_reads_prefer_oauth1() -> None:
     assert runner._transports(TOOL_INDEX["post_tweet"]) == ["oauth2", "oauth1"]
     assert runner._transports(TOOL_INDEX["get_user"]) == ["oauth1", "oauth2"]
     assert runner._transports(TOOL_INDEX["x_api_request"]) == ["oauth2", "oauth1"]
+    assert runner._transports(TOOL_INDEX["get_usage_credits"]) == ["app_only"]
 
 
 def test_broken_oauth2_is_skipped_and_reported() -> None:
@@ -276,9 +285,48 @@ def test_post_errors_carry_actionable_hints() -> None:
     from twitter_mcp.errors import XApiError
 
     error = XApiError(400, "Invalid Request", "POST", "/2/tweets")
-    assert "Read and write permissions" in str(error)
-    assert "credit balance" in str(error)
+    assert "Review the request fields" in str(error)
     assert "POST /2/tweets" in str(error)
+
+    forbidden = XApiError(403, "Forbidden", "POST", "/2/tweets")
+    assert "Read and write app permissions" in str(forbidden)
+
+
+def test_x_error_includes_field_validation_details() -> None:
+    from twitter_mcp.errors import _describe_error
+
+    detail = _describe_error({
+        "title": "Invalid Request", "detail": "One or more parameters was invalid.",
+        "errors": [{"parameter": "text", "message": "Too long"}],
+    })
+    assert "parameter" in detail and "Too long" in detail
+
+
+def test_usage_credits_uses_app_only_bearer() -> None:
+    import httpx
+    from twitter_mcp.config import OAuth1Account
+
+    calls: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        if request.url.path == "/oauth2/token":
+            return httpx.Response(200, json={"access_token": "app-bearer", "token_type": "bearer"})
+        return httpx.Response(200, json={"data": {"total_balance": 12}})
+
+    async def scenario() -> None:
+        account = OAuth1Account("test", "key", "secret", "token", "token-secret")
+        client = TwitterClient(account)
+        await client._app_client.aclose()
+        client._app_client = httpx.AsyncClient(base_url=client.base_url, transport=httpx.MockTransport(handler))
+        runner = ToolRunner(client, oauth2=None)
+        result = await runner.run(TOOL_INDEX["get_usage_credits"], {})
+        assert result["data"]["total_balance"] == 12
+        await client.aclose()
+
+    asyncio.run(scenario())
+    assert [call.url.path for call in calls] == ["/oauth2/token", "/2/usage/credits"]
+    assert calls[1].headers["Authorization"] == "Bearer app-bearer"
 
 def test_unknown_oauth2_expiry_uses_the_access_token_first() -> None:
     """A bootstrap token must be used as it is; refresh only happens on a 401."""

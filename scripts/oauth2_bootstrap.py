@@ -80,27 +80,27 @@ def exchange(client_id: str, client_secret: str, code: str, verifier: str, redir
         raise SystemExit(1)
 
 
-def app_only_token(client_id: str, client_secret: str) -> str:
+def app_only_token(api_key: str, api_secret: str) -> str:
     payload = urllib.parse.urlencode(
-        {
-            "grant_type": "client_credentials",
-            "client_id": client_id,
-            "client_secret": client_secret,
-        }
+        {"grant_type": "client_credentials"}
     ).encode()
+    credentials = base64.b64encode(f"{api_key}:{api_secret}".encode()).decode()
     request = urllib.request.Request(
-        TOKEN_URL,
+        "https://api.x.com/oauth2/token",
         data=payload,
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Authorization": f"Basic {credentials}",
+        },
     )
     with urllib.request.urlopen(request, timeout=60) as response:
         return json.loads(response.read()).get("access_token", "")
 
 
-def check_credits(client_id: str, client_secret: str) -> None:
+def check_credits(api_key: str, api_secret: str) -> None:
     """Report the pay-per-use credit balance - posting needs credits on X."""
     try:
-        token = app_only_token(client_id, client_secret)
+        token = app_only_token(api_key, api_secret)
     except Exception as exc:  # noqa: BLE001
         print(f"Could not mint an app-only token: {exc}")
         return
@@ -177,8 +177,13 @@ def main() -> None:
     print(f"TWITTER_OAUTH2_REFRESH_TOKEN={refresh_token}")
     print(f"TWITTER_OAUTH2_SCOPE={args.scope}")
     print(f"\nGranted scopes: {tokens.get('scope', args.scope)}")
-    print("\nChecking the pay-per-use credit balance (posting needs credits):")
-    check_credits(args.client_id, args.client_secret)
+    api_key = os.getenv("TWITTER_API_KEY")
+    api_secret = os.getenv("TWITTER_API_SECRET")
+    if api_key and api_secret:
+        print("\nChecking the pay-per-use credit balance:")
+        check_credits(api_key, api_secret)
+    else:
+        print("\nSet TWITTER_API_KEY and TWITTER_API_SECRET to check credits with app-only auth.")
 
 
 if __name__ == "__main__":

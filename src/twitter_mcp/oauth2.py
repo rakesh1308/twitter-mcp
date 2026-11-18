@@ -79,7 +79,9 @@ class OAuth2Client:
             scope=os.getenv("TWITTER_OAUTH2_SCOPE"),
         )
         opts = OAuth2Options(
-            token_file=os.getenv("TWITTER_OAUTH2_TOKEN_FILE") or "/data/oauth2.json",
+            token_file=os.getenv("TWITTER_OAUTH2_TOKEN_FILE") or (
+                "/tmp/oauth2.json" if os.getenv("VERCEL") else "/data/oauth2.json"
+            ),
             refresh_skew_seconds=int(os.getenv("OAUTH2_REFRESH_SKEW_SECONDS") or "60"),
         )
         client = cls(tokens, opts)

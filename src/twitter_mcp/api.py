@@ -14,6 +14,7 @@ from typing import Any
 # Auth modes:
 #   "oauth1" - OAuth 1.0a user context (always configured)
 #   "oauth2" - OAuth 2.0 user context (media / DM / Chat / Spaces families)
+#   "app_only" - OAuth 2.0 client-credentials context for app-level reads
 #   "auto"   - try the primary transport, fall back to the other on 401/403
 
 
@@ -1668,6 +1669,7 @@ add(
         "/2/usage/credits",
         "Get the remaining usage credits.",
         family="Usage",
+        auth="app_only",
         params=(),
         output="json",
         scopes=(),
