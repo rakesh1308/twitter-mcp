@@ -169,6 +169,72 @@ def test_plain_post_sends_only_text_in_json_body() -> None:
     assert prepared["body"] == {"text": "Hello from the API"}
 
 
+def test_oauth1_post_preserves_json_body_on_the_wire() -> None:
+    """Authlib otherwise signs a non-form request and replaces its body with b''."""
+    import httpx
+    from twitter_mcp.config import OAuth1Account
+
+    captured: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = request.content
+        captured["content_type"] = request.headers.get("content-type")
+        captured["authorization"] = request.headers.get("authorization")
+        return httpx.Response(201, json={"data": {"id": "123", "text": "."}})
+
+    async def scenario() -> None:
+        account = OAuth1Account("test", "key", "secret", "token", "token-secret")
+        client = TwitterClient(account)
+        original_auth = client._client._auth
+        await client._client.aclose()
+        client._client = httpx.AsyncClient(
+            base_url=client.base_url, transport=httpx.MockTransport(handler), auth=original_auth,
+        )
+        result = await ToolRunner(client, None).run(TOOL_INDEX["post_tweet"], {"text": "."})
+        assert result["data"]["id"] == "123"
+        await client.aclose()
+
+    asyncio.run(scenario())
+    assert captured["body"] == b'{"text":"."}'
+    assert captured["content_type"] == "application/json"
+    assert str(captured["authorization"]).startswith("OAuth ")
+
+
+def test_mcp_post_tweet_keeps_text_through_http_transport() -> None:
+    """Exercise the public MCP route, tool runner, OAuth signer and HTTP client."""
+    import httpx
+    from unittest.mock import patch
+    from starlette.testclient import TestClient
+    from twitter_mcp.config import OAuth1Account
+
+    captured: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = request.content
+        captured["authorization"] = request.headers.get("authorization")
+        return httpx.Response(201, json={"data": {"id": "123", "text": "."}})
+
+    account = OAuth1Account("test", "key", "secret", "token", "token-secret")
+    client = TwitterClient(account)
+    original_auth = client._client._auth
+    asyncio.run(client._client.aclose())
+    client._client = httpx.AsyncClient(
+        base_url=client.base_url, transport=httpx.MockTransport(handler), auth=original_auth,
+    )
+    with patch("twitter_mcp.server.OAuth2Client.from_env", return_value=None):
+        app = create_app(client=client)
+    with TestClient(app) as test_client:
+        response = test_client.post("/mcp", json={
+            "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+            "params": {"name": "post_tweet", "arguments": {"text": "."}},
+        })
+    asyncio.run(client.aclose())
+    assert response.status_code == 200
+    assert response.json()["result"]["structuredContent"]["data"]["text"] == "."
+    assert captured["body"] == b'{"text":"."}'
+    assert str(captured["authorization"]).startswith("OAuth ")
+
+
 def test_multipart_fields_stay_out_of_url_and_json_body() -> None:
     runner = ToolRunner(client=None, oauth2=None)  # type: ignore[arg-type]
     prepared = asyncio.run(runner._prepare(TOOL_INDEX["upload_media"], {

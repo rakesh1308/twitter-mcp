@@ -20,6 +20,27 @@ API_BASE = "https://api.x.com"
 DEFAULT_PAGE_SIZE = 10
 
 
+class PreservingOAuth1Auth(OAuth1Auth):
+    """Sign JSON requests without discarding their bodies.
+
+    OAuth 1.0a signs form fields, but not JSON fields. Authlib's default
+    non-form branch signs correctly and then accidentally returns an empty
+    body, so keep the original bytes when building the signed request.
+    """
+
+    requires_request_body = True
+
+    def auth_flow(self, request: httpx.Request):
+        body = request.content
+        content_type = request.headers.get("content-type", "")
+        signed_body = body if "application/x-www-form-urlencoded" in content_type else b""
+        url, headers, _ = self.prepare(request.method, str(request.url), request.headers, signed_body)
+        headers["Content-Length"] = str(len(body))
+        yield httpx.Request(
+            request.method, url, headers=headers, content=body, extensions=request.extensions,
+        )
+
+
 class TwitterClient:
     def __init__(
         self,
@@ -31,7 +52,7 @@ class TwitterClient:
         self.base_url = base_url
         self._client = httpx.AsyncClient(
             base_url=base_url,
-            auth=OAuth1Auth(
+            auth=PreservingOAuth1Auth(
                 client_id=account.api_key,
                 client_secret=account.api_secret,
                 token=account.access_token,
