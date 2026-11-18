@@ -1634,7 +1634,7 @@ add(
         family="Compliance",
         params=(
             P("job_id", "string", required=True, desc="Compliance job id."),
-            P("file_name", "string", required=True, desc="File name of the upload."),
+            P("file_name", "string", desc="File name when uploading a file (defaults to ids.txt)."),
             P("file_base64", "string", desc="Base64 encoded file content."),
             P("ids", "array", desc="Ids to remove (alternative to a file upload)."),
         ),

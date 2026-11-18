@@ -6,7 +6,7 @@ import asyncio
 
 from twitter_mcp.api import TOOLS, TOOL_INDEX
 from twitter_mcp.oauth1 import TwitterClient
-from twitter_mcp.server import ToolRunner, create_app, input_schema
+from twitter_mcp.server import ToolRunner, create_app, input_schema, tool_definition
 
 VALID_TYPES = {"string", "integer", "number", "boolean", "array", "object"}
 
@@ -30,6 +30,19 @@ def test_input_schemas_are_valid() -> None:
         for name, prop in schema["properties"].items():
             assert prop["type"] in VALID_TYPES, f"{tool.name}.{name}"
             assert isinstance(prop.get("description", ""), str)
+            if prop["type"] == "array":
+                assert prop["items"]["type"] in {"string", "object"}, f"{tool.name}.{name}"
+
+
+def test_output_schemas_match_x_response_envelopes() -> None:
+    for name in ("get_me", "get_user", "get_tweet", "post_tweet"):
+        schema = tool_definition(TOOL_INDEX[name])["outputSchema"]
+        assert "data" in schema["properties"]
+        assert "data" in schema["required"]
+        assert "id" not in schema.get("required", [])
+
+    success = tool_definition(TOOL_INDEX["add_list_member"])["outputSchema"]
+    assert "success" not in success.get("required", [])
 
 
 def test_path_parameters_are_resolvable() -> None:
@@ -140,6 +153,52 @@ def test_path_parameters_are_not_duplicated_in_the_query_string() -> None:
     prepared = asyncio.run(runner._prepare(TOOL_INDEX["remove_list_member"], {"list_id": "9", "user_id": "7"}))
     assert prepared["path"] == "/2/lists/9/members/7"
     assert "list_id" not in prepared["query"] and "user_id" not in prepared["query"]
+
+
+def test_query_arrays_are_comma_separated() -> None:
+    runner = ToolRunner(client=None, oauth2=None)  # type: ignore[arg-type]
+    prepared = asyncio.run(runner._prepare(TOOL_INDEX["get_posts_by_ids"], {"ids": ["1", "2"]}))
+    assert prepared["query"]["ids"] == "1,2"
+
+
+def test_multipart_fields_stay_out_of_url_and_json_body() -> None:
+    runner = ToolRunner(client=None, oauth2=None)  # type: ignore[arg-type]
+    prepared = asyncio.run(runner._prepare(TOOL_INDEX["upload_media"], {
+        "media_base64": "aGVsbG8=", "filename": "x.png", "media_type": "image/png",
+        "additional_owners": ["1", "2"],
+    }))
+    assert prepared["query"] == {}
+    assert prepared["body"] is None
+    assert prepared["files"]["media"][1] == b"hello"
+    assert prepared["data"]["additional_owners"] == "1,2"
+
+    prepared = asyncio.run(runner._prepare(TOOL_INDEX["upload_compliance_submission"], {
+        "job_id": "3", "file_name": "ids.txt", "file_base64": "MQo=",
+    }))
+    assert prepared["query"] == {}
+    assert prepared["body"] is None
+    assert prepared["files"]["file"][1] == b"1\n"
+
+    prepared = asyncio.run(runner._prepare(TOOL_INDEX["upload_compliance_submission"], {
+        "job_id": "3", "ids": ["1", "2"],
+    }))
+    assert prepared["body"] == {"ids": ["1", "2"]}
+    assert prepared["files"] is None
+
+    import pytest
+    with pytest.raises(ValueError, match="exactly one"):
+        asyncio.run(runner._prepare(TOOL_INDEX["upload_compliance_submission"], {
+            "job_id": "3", "ids": ["1"], "file_base64": "MQo=",
+        }))
+
+
+def test_invalid_json_rpc_body_is_rejected() -> None:
+    from starlette.testclient import TestClient
+
+    with TestClient(create_app()) as client:
+        response = client.post("/mcp", json=["not", "a request"])
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == -32600
 
 
 class _StubClient:

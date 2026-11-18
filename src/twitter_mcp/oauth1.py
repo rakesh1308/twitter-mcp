@@ -8,6 +8,7 @@ being interpolated by hand.
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 from authlib.integrations.httpx_client import OAuth1Auth
@@ -104,7 +105,7 @@ class TwitterClient:
     async def get_user_by_username(self, username: str) -> dict[str, Any]:
         payload = await self.request(
             "GET",
-            f"/2/users/by/username/{username}",
+            f"/2/users/by/username/{quote(username, safe='')}",
             params={"user.fields": "created_at,description,public_metrics,profile_image_url,verified,url"},
         )
         return payload["data"]

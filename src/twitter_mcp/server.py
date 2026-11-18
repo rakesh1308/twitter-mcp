@@ -60,11 +60,10 @@ OUTPUT_SCHEMAS: dict[str, dict[str, Any]] = {
     "tweet": {
         "type": "object",
         "properties": {
-            "id": {"type": "string"},
-            "text": {"type": "string"},
-            "created_at": {"type": "string"},
+            "data": {"type": "object", "properties": {"id": {"type": "string"}},
+                     "required": ["id"], "additionalProperties": True},
         },
-        "required": ["id"],
+        "required": ["data"],
         "additionalProperties": True,
     },
     "tweet_list": {
@@ -79,11 +78,10 @@ OUTPUT_SCHEMAS: dict[str, dict[str, Any]] = {
     "user": {
         "type": "object",
         "properties": {
-            "id": {"type": "string"},
-            "username": {"type": "string"},
-            "name": {"type": "string"},
+            "data": {"type": "object", "properties": {"id": {"type": "string"}},
+                     "required": ["id"], "additionalProperties": True},
         },
-        "required": ["id"],
+        "required": ["data"],
         "additionalProperties": True,
     },
     "user_list": {
@@ -96,8 +94,10 @@ OUTPUT_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "success": {
         "type": "object",
-        "properties": {"success": {"type": "boolean"}},
-        "required": ["success"],
+        "properties": {
+            "success": {"type": "boolean"},
+            "data": {"type": "object", "additionalProperties": True},
+        },
         "additionalProperties": True,
     },
     "counts": {
@@ -111,9 +111,7 @@ OUTPUT_SCHEMAS: dict[str, dict[str, Any]] = {
     "media": {
         "type": "object",
         "properties": {
-            "media_id": {"type": "string"},
-            "media_key": {"type": "string"},
-            "id": {"type": "string"},
+            "data": {"type": "object", "additionalProperties": True},
         },
         "additionalProperties": True,
     },
@@ -134,6 +132,9 @@ def input_schema(tool: Tool) -> dict[str, Any]:
             schema["description"] = param.description
         if param.enum:
             schema["enum"] = list(param.enum)
+        if param.type == "array":
+            item_type = "object" if tool.name == "update_stream_rules" and param.name in ("add", "remove") else "string"
+            schema["items"] = {"type": item_type}
         if param.minimum is not None:
             schema["minimum"] = param.minimum
         if param.maximum is not None:
@@ -325,6 +326,11 @@ class ToolRunner:
     # -- parameter preparation -------------------------------------------
 
     async def _prepare(self, tool: Tool, args: dict[str, Any]) -> dict[str, Any]:
+        if tool.name == "upload_compliance_submission":
+            has_file = bool(args.get("file_base64"))
+            has_ids = bool(args.get("ids"))
+            if has_file == has_ids:
+                raise ValueError("Provide exactly one of file_base64 or ids")
         query: dict[str, Any] = {}
         body: dict[str, Any] = {}
         files: dict[str, Any] | None = None
@@ -342,6 +348,10 @@ class ToolRunner:
                 value = param.default
             if value is None:
                 continue
+            if tool.name == "upload_media":
+                continue  # all fields belong to the multipart request below
+            if tool.name == "upload_compliance_submission" and param.name in ("file_name", "file_base64"):
+                continue
             if param.name == "payload" and isinstance(value, dict):
                 body.update(value)
                 continue
@@ -349,7 +359,7 @@ class ToolRunner:
             if target[0] in tool.body_params:
                 _assign(body, target, value)
             else:
-                query[param.api_name or param.name] = value
+                query[param.api_name or param.name] = ",".join(map(str, value)) if param.type == "array" else value
 
         # username alias -> user id (resolved before the path is assembled)
         alias_user_id: str | None = None
@@ -380,10 +390,11 @@ class ToolRunner:
             files = {"media": (args.get("filename") or "upload.png", payload, args.get("media_type") or "image/png")}
             data = {"media_category": args.get("media_category") or "tweet_image"}
             if args.get("additional_owners"):
-                data["additional_owners"] = json.dumps(args["additional_owners"])
+                data["additional_owners"] = ",".join(map(str, args["additional_owners"]))
         elif tool.name == "upload_compliance_submission" and args.get("file_base64"):
             payload = base64.b64decode(str(args["file_base64"]))
             files = {"file": (args.get("file_name") or "ids.txt", payload, "text/plain")}
+            body = {}
 
         return {"path": path, "query": query, "body": body or None, "files": files, "data": data}
 
@@ -553,6 +564,12 @@ def create_app(client: TwitterClient | None = None, oauth2: OAuth2Client | None 
         try:
             body = await request.json()
         except Exception:
+            return JSONResponse(
+                {"jsonrpc": "2.0", "id": None, "error": {"code": -32600, "message": "Invalid request"}},
+                status_code=400,
+            )
+
+        if not isinstance(body, dict):
             return JSONResponse(
                 {"jsonrpc": "2.0", "id": None, "error": {"code": -32600, "message": "Invalid request"}},
                 status_code=400,
